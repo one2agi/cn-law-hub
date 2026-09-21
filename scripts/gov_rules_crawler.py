@@ -130,7 +130,10 @@ def search_page(
     title_search: dict = {"fieldName": "f_202321360426", "withHighLight": True}
     if keyword:
         title_search["searchWord"] = keyword
-        title_search["searchType"] = "TERM"
+        # MATCH (full-text), not TERM: TERM only matches a keyword that is a
+        # single token, so free-text queries like "管理办法" return 0 hits.
+        # TERM stays correct for the controlled-vocabulary category field.
+        title_search["searchType"] = "MATCH"
 
     payload = {
         "code": "18258ab0ac9",
@@ -289,14 +292,14 @@ def search_category(
     while True:
         if max_pages is not None and page_no > max_pages:
             break
-            data = search_page(
-                auth,
-                category_name,
-                page_no,
-                page_size=page_size,
-                keyword=keyword,
-                timeout=timeout,
-            )
+        data = search_page(
+            auth,
+            category_name,
+            page_no,
+            page_size=page_size,
+            keyword=keyword,
+            timeout=timeout,
+        )
         pager = data["pager"]
         items = data["list"]
         if total is None:

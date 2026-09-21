@@ -1,5 +1,22 @@
 # 更新日志
 
+## v2.0.2 — 国家规章库检索修复 (2026-09-21)
+
+### 修复：国家规章库检索完全不可用
+
+`scripts/gov_rules_crawler.py` 中两个独立缺陷，导致国家规章库（gov.cn）检索在 v2.0.1 中 100% 失败。二者均由 `8f5b0e4` 引入并随 v2.0.1 发布。
+
+- **分页循环死代码**：`search_category()` 中 `data = search_page(...)` 被错误缩进到 `max_pages` 的 `break` 之后，成为永不执行的死代码。每次调用都会在 `data["pager"]` 处抛出 `UnboundLocalError`，CLI 与 MCP 两条入口均完全不可用。
+- **标题检索模式错误**：`search_page()` 标题字段使用 `searchType: "TERM"`。该模式仅匹配单个分词，导致 `--search "管理办法"` 返回 0 条（上游实际有 1228 条命中）。改为 `"MATCH"` 全文检索。分类字段为受控词表，继续使用 `"TERM"` 不变。
+
+修复后实测：`--search "管理办法" --categories 部门规章` 由 0 条恢复为 1228 条命中。
+
+### 测试
+
+新增 `tests/test_gov_rules_crawler.py`（11 个离线单元测试，全部 mock，不依赖网络与鉴权），覆盖分页控制流、`max_pages` / `max_items` 边界、空页终止、客户端关键词过滤、以及请求负载中标题/分类字段的检索模式。其中 7 个测试在修复前稳定失败。
+
+全量：**316 passed / 7 skipped**。
+
 ## v2.0.1 — MCP 接入与缓存自动清理 (2026-08-19)
 
 ### 新增：MCP 接入（可选）

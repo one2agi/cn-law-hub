@@ -124,7 +124,7 @@ pip install "mcp>=2.0.0"
 
 直接把仓库链接丢给 agent，让它自己完成下载、安装依赖和注册 skill。复制以下提示词即可：
 
-> 请安装并配置这个 Skill：https://github.com/ZongziForu/cn-law-hub/releases/tag/v2.0.1
+> 请安装并配置这个 Skill：https://github.com/ZongziForu/cn-law-hub/releases/tag/v2.0.2
 >
 > 从上述 release 下载 Source code 压缩包，或 clone 仓库。先阅读仓库中的 SKILL.md 和 references/setup.md，并识别当前平台正确的 skills 目录。不要直接把整个仓库复制到最终安装目录；请先下载到临时目录，再仅安装以下运行时文件：
 > - `SKILL.md`
