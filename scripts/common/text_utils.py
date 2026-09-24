@@ -82,7 +82,7 @@ def classify_legal_document_type(title: str) -> str:
     Returns: 'amendment_decision', 'judicial_reply', 'judicial_interpretation', 'statute', or 'full_text'.
     """
     clean_t = clean_text(title)
-    if "修改" in clean_t and "决定" in clean_t:
+    if ("修改" in clean_t and "决定" in clean_t) or "修正案" in clean_t:
         return "amendment_decision"
     if "批复" in clean_t:
         return "judicial_reply"
@@ -126,23 +126,41 @@ def format_legal_citation(
     from .chinese_numerals import int_to_chinese
 
     name = clean_text(law_name).strip()
-    if not (name.startswith("《") and name.endswith("》")):
-        name = f"《{name.strip('《》')}》"
+    # Extract document number suffix if present outside or inside brackets (e.g. （法释〔2020〕17号）)
+    m_doc_no = re.search(r"([（\(][^）\)]*(?:号|令|发|释|规|第)[^）\)]*[）\)])$", name)
+    doc_no = ""
+    if m_doc_no:
+        doc_no = m_doc_no.group(1).strip()
+        name = name[: m_doc_no.start()].strip()
+    clean_title = name.strip("《》").strip()
+    full_law_title = f"《{clean_title}》{doc_no}"
 
     # Article formatting
     if isinstance(article, int):
         art_str = f"第{int_to_chinese(article)}条"
     else:
         art_clean = clean_text(str(article)).strip()
+        # Handle sub-article suffixes like 之一, 之二, -1, -2
+        sub_art = ""
+        m_sub_cn = re.search(r"(之[一二三四五六七八九十]+)", art_clean)
+        if m_sub_cn:
+            sub_art = m_sub_cn.group(1)
+            art_clean = art_clean[: m_sub_cn.start()].strip()
+        else:
+            m_sub_dash = re.search(r"[-_—](\d+)", art_clean)
+            if m_sub_dash:
+                sub_art = f"之{int_to_chinese(int(m_sub_dash.group(1)))}"
+                art_clean = art_clean[: m_sub_dash.start()].strip()
+
         m_digit = re.search(r"\d+", art_clean)
         if m_digit:
-            art_str = f"第{int_to_chinese(int(m_digit.group(0)))}条"
+            art_str = f"第{int_to_chinese(int(m_digit.group(0)))}条{sub_art}"
         else:
             m_cn = re.search(r"第?([一二三四五六七八九十百千万零]+)条?", art_clean)
             if m_cn:
-                art_str = f"第{m_cn.group(1)}条"
+                art_str = f"第{m_cn.group(1)}条{sub_art}"
             else:
-                art_str = art_clean
+                art_str = f"{art_clean}{sub_art}"
 
     # Paragraph formatting (款)
     para_str = None
@@ -178,7 +196,7 @@ def format_legal_citation(
                 else:
                     item_str = i_clean
 
-    full_citation = f"{name}{art_str}"
+    full_citation = f"{full_law_title}{art_str}"
     if para_str:
         full_citation += para_str
     if item_str:
@@ -186,7 +204,7 @@ def format_legal_citation(
 
     return {
         "formatted_citation": full_citation,
-        "law_title": name,
+        "law_title": full_law_title,
         "article": art_str,
         "paragraph": para_str,
         "item": item_str,

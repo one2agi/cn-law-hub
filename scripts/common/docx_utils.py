@@ -108,8 +108,9 @@ def _extract_from_doc_binary(content: bytes) -> list:
                 break
 
         all_text = "".join(full_text)
+        all_text = re.sub(r"\x13[^\x15]*\x15?", "", all_text)
         raw_lines = re.split(r"[\r\n\x07\x0b]+", all_text)
-        lines = [l.strip("\x00\x01\x02\x03\x04\x05\x06\x0c\t ") for l in raw_lines]
+        lines = [l.strip("\x00\x01\x02\x03\x04\x05\x06\x0c\x13\x14\x15\t ") for l in raw_lines]
         return [l for l in lines if l]
     except Exception:
         return []
@@ -124,15 +125,18 @@ def _extract_from_doc_fallback(content: bytes) -> list:
         lines = []
         for sname in ole.listdir():
             stream_data = ole.openstream(sname).read()
-            for chunk in re.findall(rb"(?:[\x20-\x7e\x00-\xff]\x00){4,}", stream_data):
+            for enc in ("utf-16le", "cp936", "gb18030"):
                 try:
-                    t = chunk.decode("utf-16le", errors="ignore")
+                    t = stream_data.decode(enc, errors="ignore")
                     for l in re.split(r"[\r\n\x07\x0b]+", t):
-                        l = l.strip("\x00\x01\x02\x03\x04\x05\x06\x0c\t ")
-                        if any("\u4e00" <= c <= "\u9fff" for c in l):
+                        l = re.sub(r"\x13[^\x15]*\x15?", "", l)
+                        l = l.strip("\x00\x01\x02\x03\x04\x05\x06\x0c\x13\x14\x15\t ")
+                        if any("\u4e00" <= c <= "\u9fff" for c in l) and len(l) >= 4:
                             lines.append(l)
                 except Exception:
                     pass
+            if lines:
+                break
         return lines
     except Exception:
         return []

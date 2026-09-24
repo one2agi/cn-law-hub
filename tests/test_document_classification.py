@@ -37,3 +37,11 @@ def test_classify_statute():
     title = "中华人民共和国民法典"
     doc_type = classify_legal_document_type(title)
     assert doc_type == "statute"
+
+
+def test_classify_amendment_act():
+    title = "中华人民共和国刑法修正案（十二）"
+    doc_type = classify_legal_document_type(title)
+    assert doc_type == "amendment_decision"
+    assert get_amendment_warning(title) is not None
+

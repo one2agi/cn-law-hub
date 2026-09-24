@@ -51,3 +51,25 @@ def test_format_chinese_string_inputs():
     )
     assert res["formatted_citation"] == "《民间借贷规定》第二十八条第二款第（一）项"
     assert res["item"] == "第（一）项"
+
+
+def test_format_law_title_with_official_document_number():
+    res = format_legal_citation(
+        "《最高人民法院关于审理民间借贷案件适用法律若干问题的规定》（法释〔2020〕17号）",
+        article=13,
+        paragraph=1,
+        item=4,
+    )
+    assert res["formatted_citation"] == "《最高人民法院关于审理民间借贷案件适用法律若干问题的规定》（法释〔2020〕17号）第十三条第一款第（四）项"
+    assert res["law_title"] == "《最高人民法院关于审理民间借贷案件适用法律若干问题的规定》（法释〔2020〕17号）"
+
+
+def test_format_sub_article():
+    res1 = format_legal_citation("中华人民共和国刑法", "第一百三十三条之一")
+    assert res1["formatted_citation"] == "《中华人民共和国刑法》第一百三十三条之一"
+    assert res1["article"] == "第一百三十三条之一"
+
+    res2 = format_legal_citation("中华人民共和国刑法", "133-1")
+    assert res2["formatted_citation"] == "《中华人民共和国刑法》第一百三十三条之一"
+    assert res2["article"] == "第一百三十三条之一"
+
