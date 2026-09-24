@@ -1,16 +1,31 @@
-"""Smart rate limiter and HTTP client with retry/429 handling."""
-
+import os
 import random
 import sys
 import time
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 
 from .constants import BASE_BACKOFF, MAX_BACKOFF, MAX_RETRIES, RETRYABLE_STATUS_CODES, VERIFY_SSL
 from .text_utils import format_request_exception, redact_url
+
+
+def is_domestic_gov_domain(url: str) -> bool:
+    """Check if the target URL is an official Chinese government/institutional domain."""
+    try:
+        hostname = urlparse(url).hostname or ""
+        hostname = hostname.lower()
+        return (
+            hostname.endswith(".gov.cn")
+            or hostname == "gov.cn"
+            or hostname.endswith(".12371.cn")
+            or hostname == "12371.cn"
+        )
+    except Exception:
+        return False
 
 
 class RateLimitMode(Enum):
@@ -208,6 +223,11 @@ def http_request(method, url, headers=None, session=None, allowed_statuses=None,
     kwargs.setdefault("timeout", kwargs.pop("timeout", 30))
     kwargs.setdefault("verify", VERIFY_SSL)
 
+    force_proxy = os.environ.get("NPC_LAW_USE_PROXY", "").strip().lower() in ("1", "true")
+    if is_domestic_gov_domain(url) and not force_proxy:
+        if "proxies" not in kwargs:
+            kwargs["proxies"] = {"http": None, "https": None}
+
     limiter = _get_limiter()
     requester = session if session is not None else requests
 
@@ -274,6 +294,20 @@ def http_request(method, url, headers=None, session=None, allowed_statuses=None,
             # Remaining 5xx
             last_err = f"HTTP {resp.status_code}"
 
+        except requests.exceptions.ProxyError as pe:
+            last_err = format_request_exception(pe)
+            if kwargs.get("proxies") != {"http": None, "https": None}:
+                print(
+                    f"  [ProxyError] Local proxy failed ({pe}). Retrying with direct connection...",
+                    file=sys.stderr,
+                )
+                kwargs["proxies"] = {"http": None, "https": None}
+                if attempt < MAX_RETRIES:
+                    continue
+            if attempt < MAX_RETRIES:
+                time.sleep(_backoff(attempt))
+                continue
+            raise RuntimeError(f"Proxy connection failed after {MAX_RETRIES} retries: {last_err}")
         except requests.RequestException as e:
             last_err = format_request_exception(e)
 

@@ -57,16 +57,20 @@ from .ratelimit import (
     SmartRateLimiter,
     http_request,
     init_limiter,
+    is_domestic_gov_domain,
 )
 
 # Re-export text utilities + factory
 from .text_utils import (
+    classify_legal_document_type,
     clean_text,
     create_crawler_headers,
     decode_filename_from_url,
     ensure_dir,
     extract_year,
+    format_legal_citation,
     format_request_exception,
+    get_amendment_warning,
     redact_url,
     sanitize_filename,
 )

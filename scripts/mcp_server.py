@@ -43,6 +43,9 @@ import tax_law_crawler  # noqa: E402
 import treaty_crawler  # noqa: E402
 
 from common import (  # noqa: E402
+    classify_legal_document_type,
+    format_legal_citation as format_citation_helper,
+    get_amendment_warning,
     is_article_line,
     match_article_query,
     split_into_articles,
@@ -223,7 +226,16 @@ def get_law_detail(source: str, url: str) -> dict:
         detail = _DETAIL_ROUTER[source](url)
     except Exception as e:
         return {"source": source, "error": f"{type(e).__name__}: {e}"}
-    return {"source": source, "detail": detail}
+
+    resp = {"source": source, "detail": detail}
+    if isinstance(detail, dict):
+        title = detail.get("title") or (detail.get("data") or {}).get("title") or ""
+        if title:
+            resp["doc_type"] = classify_legal_document_type(title)
+            warning = get_amendment_warning(title)
+            if warning:
+                resp["warning"] = warning
+    return resp
 
 
 @mcp.tool()
@@ -249,14 +261,20 @@ def query_article(bbbs_id: str, query: str = None, grep: str = None) -> dict:
             results = [(n, t) for n, t in articles if match_article_query(query, n)]
             if not results:
                 results = [(n, t) for n, t in articles if query in t[: len(query) + 15]]
-        return {
-            "title": info.get("title"),
+        title = info.get("title", "")
+        warning = get_amendment_warning(title)
+        resp = {
+            "title": title,
+            "doc_type": classify_legal_document_type(title),
             "bbbs": bbbs_id,
             "query": query,
             "grep": grep,
             "count": len(results),
             "results": [{"article_num": n, "text": t} for n, t in results],
         }
+        if warning:
+            resp["warning"] = warning
+        return resp
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}
 
@@ -280,8 +298,11 @@ def preview_law(bbbs_id: str) -> dict:
             }
             for num, text in articles[:20]
         ]
-        return {
-            "title": info.get("title"),
+        title = info.get("title", "")
+        warning = get_amendment_warning(title)
+        resp = {
+            "title": title,
+            "doc_type": classify_legal_document_type(title),
             "bbbs": bbbs_id,
             "category": info.get("category"),
             "authority": info.get("authority"),
@@ -295,6 +316,9 @@ def preview_law(bbbs_id: str) -> dict:
             "preview": preview,
             "truncated": len(articles) > 20,
         }
+        if warning:
+            resp["warning"] = warning
+        return resp
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}
 
@@ -322,6 +346,32 @@ def article_search(keyword: str, law_keyword: str = None, max_laws: int = 5, con
     except Exception as e:
         return {"keyword": keyword, "count": 0, "laws": [], "error": f"{type(e).__name__}: {e}"}
     return {"keyword": keyword, "count": len(matches), "laws": matches}
+
+
+@mcp.tool()
+def format_legal_citation(
+    law_name: str,
+    article: str,
+    paragraph: str = None,
+    item: str = None,
+) -> dict:
+    """Format citation according to PRC judicial citation standards (SPC Fa Shi [2009] No. 14).
+
+    Converts Arabic/Chinese numbers into standard Chinese judicial format: 《法规名称》第X条第Y款第（Z）项.
+
+    Args:
+        law_name: Name of the law/interpretation (e.g. "民法典" or "最高人民法院关于审理民间借贷案件适用法律若干问题的规定").
+        article: Article number (e.g. 667, "667", or "第六百六十七条").
+        paragraph: Optional paragraph/clause number (e.g. 1, "1", or "第一款").
+        item: Optional item number (e.g. 4, "4", or "第（四）项").
+
+    Returns:
+        {"formatted_citation": "...", "law_title": "...", "article": "...", "paragraph": "...", "item": "..."}
+    """
+    try:
+        return format_citation_helper(law_name, article, paragraph=paragraph, item=item)
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
 
 
 if __name__ == "__main__":
