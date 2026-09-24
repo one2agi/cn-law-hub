@@ -205,6 +205,21 @@ def _backoff(attempt: int) -> float:
     return max(0.1, exp + jitter)
 
 
+def create_http_session(pool_connections: int = 10, pool_maxsize: int = 20) -> requests.Session:
+    """Create a configured requests.Session with connection pooling and keep-alive."""
+    from requests.adapters import HTTPAdapter
+
+    s = requests.Session()
+    adapter = HTTPAdapter(
+        pool_connections=pool_connections,
+        pool_maxsize=pool_maxsize,
+        max_retries=0,
+    )
+    s.mount("http://", adapter)
+    s.mount("https://", adapter)
+    return s
+
+
 def http_request(method, url, headers=None, session=None, allowed_statuses=None, **kwargs):
     """Make an HTTP request with rate limiting, 429 handling, and retries.
 
@@ -220,7 +235,8 @@ def http_request(method, url, headers=None, session=None, allowed_statuses=None,
         RuntimeError: On 401/403/404, other non-retryable 4xx, or after
                       exhausting retries on 429/5xx.
     """
-    kwargs.setdefault("timeout", kwargs.pop("timeout", 30))
+    default_timeout = int(os.environ.get("NPC_LAW_TIMEOUT", "8"))
+    kwargs.setdefault("timeout", kwargs.pop("timeout", default_timeout))
     kwargs.setdefault("verify", VERIFY_SSL)
 
     force_proxy = os.environ.get("NPC_LAW_USE_PROXY", "").strip().lower() in ("1", "true")

@@ -46,6 +46,7 @@ from common import (
     _RateLimitConfig,
     _RateLimitMode,
     _SmartRateLimiter,
+    create_http_session,
     get_cache,
     http_request,
     init_limiter,
@@ -77,11 +78,20 @@ def sxx_to_str(code: int) -> str:
 
 # Backward-compatible re-exports for tests and article_search.py
 _cache = get_cache("npc-law-db")
+_session = None
+
+
+def _get_session():
+    global _session
+    if _session is None:
+        _session = create_http_session()
+    return _session
 
 
 def _request(method, url, **kwargs):
     """Thin wrapper so tests can mock download._request while using shared http_request."""
     kwargs.setdefault("headers", HEADERS)
+    kwargs.setdefault("session", _get_session())
     return http_request(method, url, **kwargs)
 
 

@@ -174,12 +174,15 @@ def _with_source(records: list, source: str) -> list:
 
 
 @mcp.tool()
-def search_laws(source: str, keyword: str = "", category: str = "", size: int = 20) -> dict:
+def search_laws(source: str = "npc", keyword: str = "", category: str = "", size: int = 20) -> dict:
     """Search Chinese laws / regulations / policies from one official source.
 
+    Recommended default source is 'npc' (National Laws Database, ~0.3s fast structured search
+    covering all national statutes, administrative regulations, and SPC judicial interpretations).
+
     Args:
-        source: Data source. One of:
-            npc 国家法律法规库 · gov_policy 政策文件库 · moj 司法部 · party 党内法规 ·
+        source: Data source (default 'npc'). One of:
+            npc (国家法律法规库 - 推荐首选，官方秒级接口) · gov_policy 政策文件库 · moj 司法部 · party 党内法规 ·
             mod 国防部 · tax 财政部 · mee 生态环境部 · court 人民法院 · gov_rules 行政法规 ·
             treaty 条约。
         keyword: Search keyword.

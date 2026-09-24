@@ -82,6 +82,30 @@ def search_articles(keyword: str, law_keyword: str = None,
     skipped_resume = 0
     skipped_offset = offset
 
+    # Pre-fetch uncached DOCX files in parallel (up to 3 concurrent downloads)
+    target_bbbs = []
+    for r in all_rows:
+        if len(target_bbbs) >= max_laws:
+            break
+        b = r.get("bbbs")
+        if b:
+            target_bbbs.append(b)
+
+    uncached_bbbs = [b for b in target_bbbs if _cache.get_file(_cache._key("docx", b)) is None]
+    if len(uncached_bbbs) > 1:
+        from concurrent.futures import ThreadPoolExecutor
+
+        def _prefetch_docx(b_id):
+            try:
+                d_url = get_download_url(b_id, "docx")
+                res = _request("GET", d_url)
+                _cache.set_file(_cache._key("docx", b_id), res.content)
+            except Exception:
+                pass
+
+        with ThreadPoolExecutor(max_workers=min(len(uncached_bbbs), 3)) as executor:
+            list(executor.map(_prefetch_docx, uncached_bbbs))
+
     for row in all_rows:
         if processed >= max_laws:
             break

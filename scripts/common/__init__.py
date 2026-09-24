@@ -55,6 +55,7 @@ from .ratelimit import (
     RateLimitConfig,
     RateLimitMode,
     SmartRateLimiter,
+    create_http_session,
     http_request,
     init_limiter,
     is_domestic_gov_domain,
