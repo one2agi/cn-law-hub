@@ -190,10 +190,10 @@ def fetch_detail(detail_url: str, timeout: int | None = None) -> dict:
     if BeautifulSoup is not None:
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # Title from h1
-        h1 = soup.select_one("h1")
-        if h1:
-            result["title"] = clean_text(h1.get_text(" ", strip=True))
+        # Title from h1, .title, or .tit
+        title_el = soup.select_one("h1") or soup.select_one(".title") or soup.select_one(".tit")
+        if title_el:
+            result["title"] = clean_text(title_el.get_text(" ", strip=True))
 
         # Content
         content = (
