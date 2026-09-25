@@ -57,3 +57,49 @@ def test_corrupted_doc_raises_runtime_error():
         with pytest.raises(RuntimeError) as exc_info:
             extract_paragraphs_from_docx(corrupted_doc)
         assert "extraction methods failed" in str(exc_info.value)
+
+
+def test_fallback_extracts_from_worddocument_ignoring_metadata():
+    """Ensure fallback OLE scanner prioritizes WordDocument and ignores property sets."""
+    from scripts.common.docx_utils import _extract_from_doc_fallback
+    from unittest.mock import MagicMock
+
+    mock_ole = MagicMock()
+    mock_ole.exists.side_effect = lambda s: s == "WordDocument"
+
+    meta_stream = MagicMock()
+    meta_stream.read.return_value = b"\x00\x4e\x01\x4e\x02\x4e\x03\x4e"  # random bytes
+
+    doc_stream = MagicMock()
+    doc_stream.read.return_value = "第一条 为了规范民间借贷行为，维护经济金融秩序。".encode("cp936")
+
+    def openstream_side_effect(name):
+        n = name[0] if isinstance(name, (list, tuple)) else str(name)
+        if n == "WordDocument":
+            return doc_stream
+        return meta_stream
+
+    mock_ole.openstream.side_effect = openstream_side_effect
+    mock_ole.listdir.return_value = [["\x05DocumentSummaryInformation"], ["WordDocument"]]
+
+    with patch("olefile.OleFileIO", return_value=mock_ole):
+        lines = _extract_from_doc_fallback(b"\xd0\xcf\x11\xe0fake")
+        assert len(lines) > 0
+        assert any("为了规范民间借贷行为" in l for l in lines)
+        assert not any("\x05" in l for l in lines)
+
+
+def test_field_code_removal_does_not_swallow_multiline():
+    """Ensure unclosed field code does not swallow subsequent lines."""
+    import re
+
+    pattern = r"\x13[^\x15\r\n]*\x15"
+    text = "第一条 内容\x13 PAGE \\* MERGEFORMAT \x15第二条 内容"
+    cleaned = re.sub(pattern, "", text)
+    assert cleaned == "第一条 内容第二条 内容"
+
+    # Unclosed field code on line 1 should not swallow line 2
+    unclosed_text = "第一条 内容\x13 PAGE 未闭合\n第二条 内容"
+    cleaned_unclosed = re.sub(pattern, "", unclosed_text)
+    assert "第二条 内容" in cleaned_unclosed
+

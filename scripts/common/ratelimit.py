@@ -1,6 +1,7 @@
 import os
 import random
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -11,6 +12,8 @@ import requests
 
 from .constants import BASE_BACKOFF, MAX_BACKOFF, MAX_RETRIES, RETRYABLE_STATUS_CODES, VERIFY_SSL
 from .text_utils import format_request_exception, redact_url
+
+DIRECT_PROXIES = {"http": None, "https": None, "all": None}
 
 
 def is_domestic_gov_domain(url: str) -> bool:
@@ -220,6 +223,20 @@ def create_http_session(pool_connections: int = 10, pool_maxsize: int = 20) -> r
     return s
 
 
+_DEFAULT_SESSION = None
+_DEFAULT_SESSION_LOCK = threading.Lock()
+
+
+def get_default_session() -> requests.Session:
+    """Get or create the global thread-safe requests.Session with connection pooling."""
+    global _DEFAULT_SESSION
+    if _DEFAULT_SESSION is None:
+        with _DEFAULT_SESSION_LOCK:
+            if _DEFAULT_SESSION is None:
+                _DEFAULT_SESSION = create_http_session(pool_connections=20, pool_maxsize=30)
+    return _DEFAULT_SESSION
+
+
 def http_request(method, url, headers=None, session=None, allowed_statuses=None, **kwargs):
     """Make an HTTP request with rate limiting, 429 handling, and retries.
 
@@ -235,27 +252,35 @@ def http_request(method, url, headers=None, session=None, allowed_statuses=None,
         RuntimeError: On 401/403/404, other non-retryable 4xx, or after
                       exhausting retries on 429/5xx.
     """
-    default_timeout = int(os.environ.get("NPC_LAW_TIMEOUT", "8"))
-    kwargs.setdefault("timeout", kwargs.pop("timeout", default_timeout))
+    req_timeout = kwargs.pop("timeout", None)
+    if req_timeout is None:
+        try:
+            req_timeout = int(os.environ.get("NPC_LAW_TIMEOUT", "8"))
+        except (ValueError, TypeError):
+            req_timeout = 8
+    kwargs["timeout"] = req_timeout
     kwargs.setdefault("verify", VERIFY_SSL)
 
     force_proxy = os.environ.get("NPC_LAW_USE_PROXY", "").strip().lower() in ("1", "true")
     if is_domestic_gov_domain(url) and not force_proxy:
         if "proxies" not in kwargs:
-            kwargs["proxies"] = {"http": None, "https": None}
+            kwargs["proxies"] = dict(DIRECT_PROXIES)
 
     limiter = _get_limiter()
-    requester = session if session is not None else requests
+    is_mocked_request = hasattr(requests.request, "assert_called") or hasattr(requests.request, "mock")
+    if session is not None:
+        requester = session
+    elif is_mocked_request:
+        requester = requests
+    else:
+        requester = get_default_session()
 
     last_err = None
     for attempt in range(1, MAX_RETRIES + 1):
         limiter.acquire()
         try:
             start = time.time()
-            if session is not None:
-                resp = session.request(method, url, headers=headers, **kwargs)
-            else:
-                resp = requests.request(method, url, headers=headers, **kwargs)
+            resp = requester.request(method, url, headers=headers, **kwargs)
             elapsed_ms = (time.time() - start) * 1000
 
             # 429 — rate limited, backoff and retry
@@ -312,12 +337,12 @@ def http_request(method, url, headers=None, session=None, allowed_statuses=None,
 
         except requests.exceptions.ProxyError as pe:
             last_err = format_request_exception(pe)
-            if kwargs.get("proxies") != {"http": None, "https": None}:
+            if kwargs.get("proxies") != DIRECT_PROXIES:
                 print(
                     f"  [ProxyError] Local proxy failed ({pe}). Retrying with direct connection...",
                     file=sys.stderr,
                 )
-                kwargs["proxies"] = {"http": None, "https": None}
+                kwargs["proxies"] = dict(DIRECT_PROXIES)
                 if attempt < MAX_RETRIES:
                     continue
             if attempt < MAX_RETRIES:

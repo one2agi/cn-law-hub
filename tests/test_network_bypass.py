@@ -36,6 +36,7 @@ def test_proxy_bypass_for_gov_domain():
             assert "proxies" in call_kwargs
             assert call_kwargs["proxies"]["http"] is None
             assert call_kwargs["proxies"]["https"] is None
+            assert call_kwargs["proxies"]["all"] is None
 
 
 def test_proxy_error_self_healing():
@@ -53,7 +54,9 @@ def test_proxy_error_self_healing():
         resp = http_request("GET", "https://example.com/api", proxies={"http": "http://127.0.0.1:8045"})
         assert resp.status_code == 200
         assert mock_req.call_count == 2
-        # The second call must have fallen back to proxies={"http": None, "https": None}
+        # The second call must have fallen back to proxies={"http": None, "https": None, "all": None}
         fallback_kwargs = mock_req.call_args.kwargs
         assert fallback_kwargs["proxies"]["http"] is None
         assert fallback_kwargs["proxies"]["https"] is None
+        assert fallback_kwargs["proxies"]["all"] is None
+

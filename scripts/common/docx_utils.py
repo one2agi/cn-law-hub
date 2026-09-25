@@ -108,7 +108,7 @@ def _extract_from_doc_binary(content: bytes) -> list:
                 break
 
         all_text = "".join(full_text)
-        all_text = re.sub(r"\x13[^\x15]*\x15?", "", all_text)
+        all_text = re.sub(r"\x13[^\x15\r\n]*\x15", "", all_text)
         raw_lines = re.split(r"[\r\n\x07\x0b]+", all_text)
         lines = [l.strip("\x00\x01\x02\x03\x04\x05\x06\x0c\x13\x14\x15\t ") for l in raw_lines]
         return [l for l in lines if l]
@@ -122,22 +122,48 @@ def _extract_from_doc_fallback(content: bytes) -> list:
         import olefile
 
         ole = olefile.OleFileIO(BytesIO(content))
-        lines = []
+        target_streams = []
+        if ole.exists("WordDocument"):
+            target_streams.append(["WordDocument"])
         for sname in ole.listdir():
-            stream_data = ole.openstream(sname).read()
-            for enc in ("utf-16le", "cp936", "gb18030"):
+            name = sname[0] if isinstance(sname, (list, tuple)) else str(sname)
+            if name.startswith("\x05") or name.endswith("SummaryInformation") or name == "CompObj":
+                continue
+            if sname not in target_streams:
+                target_streams.append(sname)
+
+        best_lines = []
+        best_chinese_count = 0
+
+        for sname in target_streams:
+            try:
+                stream_data = ole.openstream(sname).read()
+            except Exception:
+                continue
+
+            for enc in ("cp936", "utf-16le", "gb18030"):
                 try:
                     t = stream_data.decode(enc, errors="ignore")
+                    t = re.sub(r"\x13[^\x15\r\n]*\x15", "", t)
+                    cur_lines = []
+                    cur_chinese_count = 0
                     for l in re.split(r"[\r\n\x07\x0b]+", t):
-                        l = re.sub(r"\x13[^\x15]*\x15?", "", l)
                         l = l.strip("\x00\x01\x02\x03\x04\x05\x06\x0c\x13\x14\x15\t ")
-                        if any("\u4e00" <= c <= "\u9fff" for c in l) and len(l) >= 4:
-                            lines.append(l)
+                        c_count = sum(1 for c in l if "\u4e00" <= c <= "\u9fff")
+                        if c_count >= 2 and len(l) >= 4:
+                            cur_lines.append(l)
+                            cur_chinese_count += c_count
+
+                    if cur_chinese_count > best_chinese_count:
+                        best_chinese_count = cur_chinese_count
+                        best_lines = cur_lines
                 except Exception:
                     pass
-            if lines:
+
+            if best_lines and sname in (["WordDocument"], "WordDocument"):
                 break
-        return lines
+
+        return best_lines
     except Exception:
         return []
 

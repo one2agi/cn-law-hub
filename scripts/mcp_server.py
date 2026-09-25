@@ -354,9 +354,9 @@ def article_search(keyword: str, law_keyword: str = None, max_laws: int = 5, con
 @mcp.tool()
 def format_legal_citation(
     law_name: str,
-    article: str,
-    paragraph: str | None = None,
-    item: str | None = None,
+    article: str | int,
+    paragraph: str | int | None = None,
+    item: str | int | None = None,
 ) -> dict:
     """Format citation according to PRC judicial citation standards (SPC Fa Shi [2009] No. 14).
 

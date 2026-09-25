@@ -235,6 +235,20 @@ class TestHttpRequestSession(unittest.TestCase):
         self.assertIsInstance(session, req_mod.Session)
         self.assertEqual(resp.status_code, 200)
 
+    def test_default_session_connection_pooling(self):
+        """When session is None and requests.request is not mocked, use get_default_session()."""
+        from common.ratelimit import get_default_session
+
+        default_session = get_default_session()
+        mock_resp = mock.MagicMock()
+        mock_resp.status_code = 200
+
+        with mock.patch.object(default_session, "request", return_value=mock_resp) as mock_sess_req:
+            resp = http_request("GET", "https://example.com/api")
+            self.assertEqual(resp.status_code, 200)
+            mock_sess_req.assert_called_once()
+
+
 
 class TestVerifySSLDefault(unittest.TestCase):
     def test_verify_ssl_defaults_true(self):

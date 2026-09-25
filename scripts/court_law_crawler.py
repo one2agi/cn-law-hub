@@ -79,7 +79,7 @@ def _get_session():
 # ---------------------------------------------------------------------------
 
 
-def fetch_list_page(category_id: str, page: int = 1, timeout: int = 8):
+def fetch_list_page(category_id: str, page: int = 1, timeout: int | None = None):
     """Fetch a category list page.
 
     Page 1: /fabu/gengduo/{cat_id}.html
@@ -169,7 +169,7 @@ def parse_list_page(html: str) -> tuple[list[dict], int]:
 # ---------------------------------------------------------------------------
 
 
-def fetch_detail(detail_url: str, timeout: int = 8) -> dict:
+def fetch_detail(detail_url: str, timeout: int | None = None) -> dict:
     """Fetch and parse a judicial document detail page."""
     cache_key = _cache._key("detail", detail_url)
     cached = _cache.get(cache_key, max_age=86400)
@@ -237,7 +237,7 @@ def search_keyword_in_records(records: list[dict], keyword: str) -> list[dict]:
 
 
 def search_collect(
-    keyword: str = "", category: str = "", max_items: int = 20, timeout: int = 8
+    keyword: str = "", category: str = "", max_items: int = 20, timeout: int | None = None
 ) -> list[dict]:
     """Search and collect judicial documents with concurrent page pre-fetching."""
     records = []
@@ -392,7 +392,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--rate-limit", choices=["auto", "off", "fixed", "adaptive"], default="auto"
     )
-    parser.add_argument("--timeout", type=int, default=30)
+    parser.add_argument("--timeout", type=int, default=None)
     parser.add_argument("--no-cache", action="store_true")
     parser.add_argument("--cache-stats", action="store_true")
     parser.add_argument("--cache-clear", action="store_true")

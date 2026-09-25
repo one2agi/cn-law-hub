@@ -94,6 +94,47 @@ class TestSearchArticles(unittest.TestCase):
 
         self.assertEqual(len(results), 2)
 
+    @mock.patch("article_search.extract_paragraphs_from_docx")
+    @mock.patch("article_search._cache")
+    @mock.patch("article_search._request")
+    @mock.patch("article_search.get_download_url")
+    @mock.patch("article_search.search_laws")
+    def test_resume_mode_with_prefetch(
+        self, mock_search, mock_get_url, mock_request, mock_cache, mock_extract
+    ):
+        mock_search.return_value = {
+            "code": 200,
+            "total": 3,
+            "rows": [
+                {"bbbs": "id1", "title": "Cached Law 1", "sxx": 3},
+                {"bbbs": "id2", "title": "Uncached Law 2", "sxx": 3},
+                {"bbbs": "id3", "title": "Uncached Law 3", "sxx": 3},
+            ],
+        }
+        # Initially, only id1 is cached
+        cache_store = {"docx:id1": b"cached docx"}
+        mock_cache._key.side_effect = lambda prefix, b: f"{prefix}:{b}"
+        mock_cache.get_file.side_effect = lambda k: cache_store.get(k)
+        def set_file_mock(k, v):
+            cache_store[k] = v
+        mock_cache.set_file.side_effect = set_file_mock
+
+        mock_get_url.return_value = "http://fake/download"
+        mock_request.return_value.content = b"downloaded docx"
+        mock_extract.return_value = ["第一条 违约金"]
+
+        # Run with resume=True
+        results = art_search.search_articles("违约金", max_laws=3, resume=True, json_output=False)
+
+        # id1 was initially cached -> skipped by resume
+        # id2 and id3 were uncached -> prefetched and searched -> returned in results
+        self.assertEqual(len(results), 2)
+        titles = [r["title"] for r in results]
+        self.assertNotIn("Cached Law 1", titles)
+        self.assertIn("Uncached Law 2", titles)
+        self.assertIn("Uncached Law 3", titles)
+
+
 
 if __name__ == "__main__":
     unittest.main()
