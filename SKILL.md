@@ -61,6 +61,12 @@ Supports Chinese numerals (`第三十八条`), Arabic (`第38条`), or bare numb
 
 For cross-law article search, use `scripts/article_search.py <keyword> --max-laws N`.
 
+## Legal Citation Standard (裁判文书规范引用)
+
+When drafting court filings, briefs, or legal memos, format statutory citations deterministically using `format_legal_citation` (or follow SPC Fa Shi [2009] No. 14):
+- Standard pattern: `《法规名称》（发文字号）第X条第Y款第（Z）项`（汉字大写数词）。
+- Sub-articles must retain "之一/之二" (e.g. `第一百三十三条之一` for dangerous driving).
+
 ## Rate Limiting
 
 Auto mode picks by estimated requests: **OFF** (≤10), **FIXED** 5 req/s (11–100), **ADAPTIVE** 1–8 req/s with 429 backoff (>100). Override: `--rate-limit {off|fixed|adaptive}`.
@@ -80,6 +86,7 @@ Local file cache enabled (~/.cache/ per namespace). Search results: 1h TTL. Deta
 5. For same-name / multi-version documents, flag the ambiguity and verify amendment, repeal, and effective-date information.
 6. Distinguish document types: 法律, 行政法规, 地方性法规, 规章, 司法解释, 司法文件, 党内法规, 政策文件, 通知, 案例, 条约. Do not conflate.
 7. Never write "现行法律" as a generic label for all official publications.
+8. **Amendment Patch Warning (修改决定防踩坑)**: When a document is tagged as `amendment_decision` (如《修改决定》、《修正案》), explicitly note that it only contains amendatory items and article numbers may shift in consolidated versions. Always verify the latest consolidated text on NPC before finalizing citations.
 
 ---
 

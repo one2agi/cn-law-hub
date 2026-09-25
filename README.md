@@ -113,7 +113,7 @@ pip install "mcp>=2.0.0"
 
 | | **Skill 版**（推荐，主路径） | **MCP 版**（可选） |
 |---|---|---|
-| 形态 | 注册为 agent 的 Skill，自然语言或 `/cn-law-hub` 调用 | 一个 stdio server，暴露 5 个 MCP 工具 |
+| 形态 | 注册为 agent 的 Skill，自然语言或 `/cn-law-hub` 调用 | 一个 stdio server，暴露 6 个 MCP 工具 |
 | 适用 | Claude Code / Codex / Kimi 等支持 skill 的 agent | 任意 MCP 兼容 agent（Claude Code / Cline / Cursor / Kimi / Codex） |
 | 依赖 | 仅 `requirements.txt` | 额外 `pip install "mcp>=2.0.0"` |
 | 配置 | agent 注册 skill | 见 `references/mcp_setup.md`；Claude Code 自动读 `.mcp.json` |
@@ -294,7 +294,7 @@ classify_by_authority("广州市人民代表大会常务委员会")
 ## MCP 接入（可选）
 
 **MCP 版是什么**：把同一套检索能力封装成一个标准 MCP server（一个进程、
-5 个工具），任何 MCP 兼容 agent 都能连接调用。它与 Skill 版共享全部
+6 个工具），任何 MCP 兼容 agent 都能连接调用。它与 Skill 版共享全部
 `scripts/` 爬虫代码，`mcp_server.py` 只做转发，不修改任何现有文件。
 
 **和 Skill 版怎么选**：
@@ -306,23 +306,19 @@ pip install "mcp>=2.0.0"
 python3 scripts/mcp_server.py        # 启动 stdio server（等待 MCP 客户端连接）
 ```
 
-```bash
-pip install "mcp>=2.0.0"
-python3 scripts/mcp_server.py        # 启动 stdio server（等待 MCP 客户端连接）
-```
-
 Claude Code 会自动读取仓库根目录的 [`.mcp.json`](.mcp.json)，打开项目即接入；
 其他 agent 的配置见 [`references/mcp_setup.md`](references/mcp_setup.md)。
 
-提供 5 个工具：
+提供 6 个工具：
 
 | 工具 | 说明 |
 |---|---|
 | `search_laws(source, keyword, category?, size?)` | 统一搜索 10 个数据源 |
-| `get_law_detail(source, url)` | 拉取单条记录详情 |
+| `get_law_detail(source, url)` | 拉取单条记录详情（含修改决定条号顺移预警） |
 | `query_article(bbbs_id, query?, grep?)` | 按条号/关键词查单部法律法条 |
 | `preview_law(bbbs_id)` | 预览法律结构（条数 / 编号格式 / 前 20 条） |
-| `article_search(keyword, law_keyword?, max_laws?, context?)` | 跨法规法条级搜索 |
+| `article_search(keyword, law_keyword?, max_laws?, context?)` | 跨法规法条级并发搜索 |
+| `format_legal_citation(law_name, article, paragraph?, item?)` | 裁判文书标准法律引用格式化（依最高法规范） |
 
 ---
 
