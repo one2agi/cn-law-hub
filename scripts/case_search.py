@@ -216,6 +216,9 @@ def fetch_court_guiding_detail(url_or_id: str, no_cache: bool = False) -> Dict[s
     title = clean_text(title_tag.get_text()) if title_tag else ""
     title = re.sub(r"\s*-\s*中华人民共和国最高人民法院.*$", "", title)
 
+    m = re.search(r"指导(?:性)?案例\s*(\d+)号", title)
+    case_no = f"指导性案例{m.group(1)}号" if m else ""
+
     body_tag = soup.find(class_="txt_txt") or soup.find(class_="txt")
     full_text = clean_text(body_tag.get_text("\n")) if body_tag else ""
 
@@ -224,9 +227,9 @@ def fetch_court_guiding_detail(url_or_id: str, no_cache: bool = False) -> Dict[s
     facts = ""
     reasoning = ""
 
-    if "【裁判要点】" in full_text:
-        parts = re.split(r"【(裁判要点|基本案情|裁判理由|相关法条)】", full_text)
-        # parts structure: [preamble, '裁判要点', text, '基本案情', text, ...]
+    heading_pattern = r"(?:【|(?:\n|^)\s*)(裁判要点|基本案情|裁判理由|相关法条|裁判结果)(?:】|[:：]|\n|\s)"
+    parts = re.split(heading_pattern, full_text)
+    if len(parts) > 1:
         for i in range(1, len(parts), 2):
             tag = parts[i]
             val = clean_text(parts[i + 1]) if i + 1 < len(parts) else ""
@@ -240,6 +243,8 @@ def fetch_court_guiding_detail(url_or_id: str, no_cache: bool = False) -> Dict[s
     record = {
         "source": "court_guiding",
         "title": title,
+        "case_no": case_no,
+        "court": "最高人民法院",
         "url": full_url,
         "key_points": key_points,
         "facts": facts,
@@ -373,6 +378,7 @@ def main():
     parser.add_argument("--token", help="临时传入凭证 Token（覆盖环境变量和配置文件）")
     parser.add_argument("--cookie", help="临时传入 Cookie（用于 wenshu）")
     parser.add_argument("--set-token", nargs=2, metavar=("SOURCE", "TOKEN"), help="保存凭证到本地配置文件 (例: --set-token rmfyalk 'xxx')")
+    parser.add_argument("--set-cookie", nargs=2, metavar=("SOURCE", "COOKIE"), help="保存 Cookie 到本地配置文件 (例: --set-cookie wenshu 'xxx')")
     parser.add_argument("--clear-token", metavar="SOURCE", help="清除本地保存的凭证 (例: --clear-token rmfyalk)")
     parser.add_argument("-o", "--output", help="输出结果文件路径 (.json, .jsonl, .md)")
     parser.add_argument("--no-cache", action="store_true", help="忽略本地缓存")
@@ -387,6 +393,15 @@ def main():
             print(f"✅ 成功保存 {src} 凭证到本地配置文件！")
         else:
             print(f"❌ 保存 {src} 凭证失败。")
+        return
+
+    if args.set_cookie:
+        src, ck = args.set_cookie
+        success = set_credential(src, cookie=ck)
+        if success:
+            print(f"✅ 成功保存 {src} Cookie 到本地配置文件！")
+        else:
+            print(f"❌ 保存 {src} Cookie 失败。")
         return
 
     if args.clear_token:

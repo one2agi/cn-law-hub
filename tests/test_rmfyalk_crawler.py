@@ -6,10 +6,11 @@ import rmfyalk_crawler
 
 
 def test_rmfyalk_search_no_token():
-    res = rmfyalk_crawler.search_cases(keyword="民间借贷", token=None, no_cache=True)
-    assert res["error"] == "AUTHENTICATION_REQUIRED"
-    assert "人民法院案例库需要认证凭证" in res["message"]
-    assert res["count"] == 0
+    with patch("rmfyalk_crawler.get_credential", return_value={"token": None, "cookie": None}):
+        res = rmfyalk_crawler.search_cases(keyword="民间借贷", token=None, no_cache=True)
+        assert res["error"] == "AUTHENTICATION_REQUIRED"
+        assert "人民法院案例库需要认证凭证" in res["message"]
+        assert res["count"] == 0
 
 
 def test_rmfyalk_search_success():

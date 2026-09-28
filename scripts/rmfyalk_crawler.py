@@ -133,7 +133,7 @@ def search_cases(
         "searchParams": {
             "userSearchType": 1,
             "isAdvSearch": "0",
-            "selectValue": "qw",
+            "selectValue": ["qw"],
             "lib": lib,
             "sort_field": "",
             "keyTitle": [keyword] if keyword else [],
@@ -197,25 +197,35 @@ def search_cases(
         }
 
     res_data = data.get("data") or {}
-    total = res_data.get("total") or 0
-    raw_rows = res_data.get("rows") or []
+    total = res_data.get("totalCount") or res_data.get("total") or 0
+    raw_rows = res_data.get("datas") or res_data.get("rows") or []
 
     records = []
     for row in raw_rows:
-        gid = row.get("gid", "")
+        gid = row.get("id") or row.get("cpws_al_id") or row.get("gid", "")
+        title = clean_text(row.get("cpws_al_title") or row.get("title", ""))
+        case_no = row.get("cpws_al_no", "")
+        court_case_no = row.get("cpws_al_ajzh", "")
+        court = row.get("cpws_al_slfy_name") or row.get("cpws_al_sf") or row.get("cpws_al_slfy", "")
+        judge_date = row.get("cpws_al_zs_date", "")
+        case_type = row.get("cpws_al_case_sort_name") or row.get("case_sort_name", "")
+        raw_kw = row.get("cpws_al_keyword") or row.get("keyword_cpwsAl", "")
+        keywords = ", ".join(raw_kw) if isinstance(raw_kw, list) else str(raw_kw)
+        key_points = clean_text(row.get("cpws_al_cpyz") or row.get("cpws_al_cpyt", ""))
+        lib_type = row.get("lib", "参考案例")
         detail_url = f"{BASE_URL}/view/content.html?id={gid}&lib={lib}" if gid else ""
         records.append({
             "source": "rmfyalk",
             "gid": gid,
-            "title": clean_text(row.get("title", "")),
-            "case_no": row.get("cpws_al_no", ""),
-            "court_case_no": row.get("cpws_al_ajzh", ""),
-            "court": row.get("cpws_al_slfy", ""),
-            "judge_date": row.get("cpws_al_zs_date", ""),
-            "case_type": row.get("case_sort_name", ""),
-            "keywords": row.get("keyword_cpwsAl", ""),
-            "key_points": clean_text(row.get("cpws_al_cpyt", "")),
-            "lib_type": row.get("lib", "参考案例"),
+            "title": title,
+            "case_no": case_no,
+            "court_case_no": court_case_no,
+            "court": court,
+            "judge_date": judge_date,
+            "case_type": case_type,
+            "keywords": keywords,
+            "key_points": key_points,
+            "lib_type": lib_type,
             "url": detail_url,
         })
 
@@ -324,21 +334,23 @@ def fetch_case_detail(
             "error": f"API_ERROR: {msg} (code: {code})",
         }
 
-    d = data.get("data") or {}
+    raw_data = data.get("data") or {}
+    d = raw_data.get("data") if isinstance(raw_data, dict) and isinstance(raw_data.get("data"), dict) else raw_data
     record = {
         "source": "rmfyalk",
         "gid": gid,
-        "title": clean_text(d.get("title", "")),
+        "title": clean_text(d.get("cpws_al_title") or d.get("title", "")),
         "case_no": d.get("cpws_al_no", ""),
         "court_case_no": d.get("cpws_al_ajzh", ""),
-        "court": d.get("cpws_al_slfy", ""),
+        "court": d.get("cpws_al_slfy_name") or d.get("cpws_al_sf") or d.get("cpws_al_slfy", ""),
         "judge_date": d.get("cpws_al_zs_date", ""),
-        "keywords": d.get("cpws_al_keyword", ""),
-        "procedure": d.get("cpws_al_cpxz", ""),
-        "key_points": clean_text(d.get("cpws_al_cpyt", "")),
+        "keywords": ", ".join(d.get("cpws_al_keyword")) if isinstance(d.get("cpws_al_keyword"), list) else (d.get("cpws_al_keyword") or d.get("keyword_cpwsAl", "")),
+        "procedure": d.get("cpws_al_slcx_name") or d.get("cpws_al_cpxz", ""),
+        "key_points": clean_text(d.get("cpws_al_cpyz") or d.get("cpws_al_cpyt", "")),
         "facts": clean_text(d.get("cpws_al_jbaq", "")),
         "reasoning": clean_text(d.get("cpws_al_cply", "")),
-        "ruling": clean_text(d.get("cpws_al_jg", "")),
+        "ruling": clean_text(d.get("cpws_al_cpjg") or d.get("cpws_al_jg", "")),
+        "related_laws": clean_text(d.get("cpws_al_glsy", "")),
         "url": f"{BASE_URL}/view/content.html?id={gid}",
     }
 

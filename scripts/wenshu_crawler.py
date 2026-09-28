@@ -76,9 +76,13 @@ def _build_headers(
     active_token = resolved.get("token")
     active_cookie = resolved.get("cookie")
 
+    # If cookie is unset but token looks like a cookie string, treat it as cookie
+    if not active_cookie and active_token and ("=" in active_token or ";" in active_token):
+        active_cookie = active_token
+
     if active_cookie:
         headers["Cookie"] = active_cookie
-    if active_token:
+    if active_token and active_token != active_cookie:
         if "Bearer " in active_token:
             headers["Authorization"] = active_token
         else:
@@ -189,43 +193,83 @@ def search_cases(
             "error": f"REQUEST_FAILED: {e}",
         }
 
-    # Wenshu returns structure with result list or encrypted string
+    if not isinstance(data, dict):
+        return {
+            "source": "wenshu",
+            "keyword": keyword,
+            "total": 0,
+            "count": 0,
+            "records": [],
+            "error": "INVALID_RESPONSE",
+            "message": f"裁判文书网返回了非字典响应格式: {type(data).__name__}",
+        }
+
+    # Check for authentication or error code in response
+    code = str(data.get("code") or data.get("status") or "")
+    msg = data.get("msg") or data.get("message") or ""
+    if code in ("401", "403") or "未登录" in msg:
+        return {
+            "source": "wenshu",
+            "keyword": keyword,
+            "total": 0,
+            "count": 0,
+            "records": [],
+            "error": "AUTHENTICATION_FAILED",
+            "message": f"裁判文书网凭证已失效（响应信息: {msg or code}）。\n{WENSHU_HELP_MSG}",
+        }
+
+    res_field = data.get("result")
+    data_field = data.get("data")
+    if isinstance(res_field, str) or isinstance(data_field, str):
+        return {
+            "source": "wenshu",
+            "keyword": keyword,
+            "total": 0,
+            "count": 0,
+            "records": [],
+            "error": "ENCRYPTED_OR_BLOCKED",
+            "message": (
+                "裁判文书网返回了密文数据或安全验证拦截，请在浏览器中重新登录并复制有效 Cookie。\n"
+                f"{WENSHU_HELP_MSG}"
+            ),
+        }
+
+    raw_list = []
+    if isinstance(res_field, dict):
+        raw_list = res_field.get("list") or []
+        total = res_field.get("total") or len(raw_list)
+    elif isinstance(data_field, dict):
+        raw_list = data_field.get("list") or []
+        total = data_field.get("total") or len(raw_list)
+    elif isinstance(data.get("rows"), list):
+        raw_list = data.get("rows")
+        total = len(raw_list)
+    else:
+        total = 0
+
     records = []
-    total = 0
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        doc_id = item.get("DocId") or item.get("id") or item.get("s0", "")
+        title = clean_text(item.get("案件名称") or item.get("s1") or item.get("title", ""))
+        case_no = item.get("案号") or item.get("s7") or ""
+        court = item.get("审判法院") or item.get("s2") or ""
+        judge_date = item.get("裁判日期") or item.get("s31") or ""
+        case_type = item.get("案件类型") or item.get("s8") or ""
+        reasoning = clean_text(item.get("裁判要旨") or item.get("s26") or "")
 
-    if isinstance(data, dict):
-        raw_list = (
-            data.get("result", {}).get("list")
-            or data.get("data", {}).get("list")
-            or data.get("rows")
-            or []
-        )
-        total = (
-            data.get("result", {}).get("total")
-            or data.get("data", {}).get("total")
-            or len(raw_list)
-        )
-
-        for item in raw_list:
-            doc_id = item.get("DocId") or item.get("id") or item.get("s0", "")
-            title = clean_text(item.get("案件名称") or item.get("s1") or item.get("title", ""))
-            case_no = item.get("案号") or item.get("s7") or ""
-            court = item.get("审判法院") or item.get("s2") or ""
-            judge_date = item.get("裁判日期") or item.get("s31") or ""
-            case_type = item.get("案件类型") or item.get("s8") or ""
-            reasoning = clean_text(item.get("裁判要旨") or item.get("s26") or "")
-
-            records.append({
-                "source": "wenshu",
-                "doc_id": doc_id,
-                "title": title,
-                "case_no": case_no,
-                "court": court,
-                "judge_date": judge_date,
-                "case_type": case_type,
-                "summary": reasoning,
-                "url": f"{BASE_URL}/website/wenshu/181107ANFZ0HXBR4/index.html?docId={doc_id}" if doc_id else "",
-            })
+        records.append({
+            "source": "wenshu",
+            "doc_id": doc_id,
+            "title": title,
+            "case_no": case_no,
+            "court": court,
+            "judge_date": judge_date,
+            "case_type": case_type,
+            "summary": reasoning,
+            "url": f"{BASE_URL}/website/wenshu/181107ANFZ0HXBR4/index.html?docId={doc_id}" if doc_id else "",
+        })
 
     result = {
         "source": "wenshu",
@@ -325,6 +369,13 @@ def fetch_case_detail(
         }
 
     raw = data.get("result") or data.get("data") or {}
+    if not isinstance(raw, dict):
+        return {
+            "source": "wenshu",
+            "doc_id": clean_id,
+            "error": "ENCRYPTED_OR_BLOCKED",
+            "message": "裁判文书网返回了密文或拦截信息，请在浏览器中重新登录并复制有效 Cookie。",
+        }
     record = {
         "source": "wenshu",
         "doc_id": clean_id,

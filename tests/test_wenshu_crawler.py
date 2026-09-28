@@ -6,10 +6,11 @@ import wenshu_crawler
 
 
 def test_wenshu_search_no_auth():
-    res = wenshu_crawler.search_cases(keyword="借款合同", token=None, cookie=None, no_cache=True)
-    assert res["error"] == "AUTHENTICATION_REQUIRED"
-    assert "中国裁判文书网需要用户登录凭证" in res["message"]
-    assert res["count"] == 0
+    with patch("wenshu_crawler.get_credential", return_value={"token": None, "cookie": None}):
+        res = wenshu_crawler.search_cases(keyword="借款合同", token=None, cookie=None, no_cache=True)
+        assert res["error"] == "AUTHENTICATION_REQUIRED"
+        assert "中国裁判文书网需要用户登录凭证" in res["message"]
+        assert res["count"] == 0
 
 
 def test_wenshu_search_success():

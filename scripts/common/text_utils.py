@@ -24,8 +24,11 @@ def clean_text(value) -> str:
         return " | ".join(clean_text(item) for item in value if clean_text(item))
     text = str(value)
     text = EM_TAG_RE.sub("", text)
-    text = SPACE_RE.sub(" ", text).strip()
-    return text
+    text = re.sub(r"(?i)<br\s*/?>", "\n", text)
+    text = re.sub(r"(?i)</?p\b[^>]*>", "\n", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    lines = [SPACE_RE.sub(" ", line).strip() for line in text.split("\n")]
+    return "\n".join(line for line in lines if line).strip()
 
 
 def decode_filename_from_url(url: str) -> str | None:

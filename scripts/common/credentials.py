@@ -22,11 +22,19 @@ def _read_config() -> Dict[str, Any]:
 
 
 def _write_config(config: Dict[str, Any]) -> bool:
-    """Save the credentials configuration file safely."""
+    """Save the credentials configuration file safely with secure permissions."""
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            CONFIG_DIR.chmod(0o700)
+        except Exception:
+            pass
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
+        try:
+            CONFIG_FILE.chmod(0o600)
+        except Exception:
+            pass
         return True
     except Exception:
         return False
@@ -81,6 +89,9 @@ def get_credential(
                 or os.getenv("CN_LAW_WENSHU_COOKIE")
                 or config.get("cookie")
             )
+        # Smart fallback: If cookie is unset but token contains cookie delimiters (= or ;), treat as cookie
+        if not resolved_cookie and resolved_token and ("=" in resolved_token or ";" in resolved_token):
+            resolved_cookie = resolved_token
 
     else:
         # Generic source resolution
