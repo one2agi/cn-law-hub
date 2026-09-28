@@ -24,17 +24,20 @@ def _read_config() -> Dict[str, Any]:
 def _write_config(config: Dict[str, Any]) -> bool:
     """Save the credentials configuration file safely with secure permissions."""
     try:
+        import tempfile
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         try:
             CONFIG_DIR.chmod(0o700)
         except Exception:
             pass
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        temp_fd, temp_path = tempfile.mkstemp(dir=CONFIG_DIR, prefix="config_", suffix=".tmp")
+        with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
         try:
-            CONFIG_FILE.chmod(0o600)
+            os.chmod(temp_path, 0o600)
         except Exception:
             pass
+        os.replace(temp_path, CONFIG_FILE)
         return True
     except Exception:
         return False
@@ -61,7 +64,8 @@ def get_credential(
         Dict with keys 'token' and 'cookie'.
     """
     source = source.lower().strip()
-    config = _read_config().get(source, {})
+    raw_cfg = _read_config().get(source)
+    config = raw_cfg if isinstance(raw_cfg, dict) else {}
 
     resolved_token = token
     resolved_cookie = cookie
@@ -125,7 +129,8 @@ def set_credential(
     """
     source = source.lower().strip()
     config = _read_config()
-    current = config.get(source, {})
+    raw_current = config.get(source)
+    current = raw_current if isinstance(raw_current, dict) else {}
 
     if token is not None:
         if token.strip():

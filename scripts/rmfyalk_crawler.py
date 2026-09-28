@@ -305,7 +305,10 @@ def fetch_case_detail(
     Returns:
         Dict with full case metadata and text sections.
     """
-    raw_case_id = str(case_id).strip()
+    raw_case_id = str(case_id or "").strip()
+    if not raw_case_id:
+        return {"source": "rmfyalk", "gid": "", "error": "INVALID_ARGUMENT", "message": "case_id is required"}
+
     gid = urllib.parse.unquote(raw_case_id)
     if "id=" in gid:
         parsed = urllib.parse.urlparse(gid)
@@ -322,8 +325,22 @@ def fetch_case_detail(
             no_cache=no_cache,
             size=1,
         )
+        if search_res.get("error"):
+            return {
+                "source": "rmfyalk",
+                "gid": gid,
+                "error": search_res.get("error"),
+                "message": search_res.get("message", f"解析案号 {gid} 失败"),
+            }
         if search_res.get("records"):
             gid = search_res["records"][0]["gid"]
+        else:
+            return {
+                "source": "rmfyalk",
+                "gid": gid,
+                "error": "CASE_NOT_FOUND",
+                "message": f"未在人民法院案例库中找到案号为 '{gid}' 的案例",
+            }
 
     sess = session or _get_session()
     headers = _build_headers(token=token)
@@ -405,7 +422,7 @@ def fetch_case_detail(
         "reasoning": clean_text(d.get("cpws_al_cply", "")),
         "ruling": clean_text(d.get("cpws_al_cpjg") or d.get("cpws_al_jg", "")),
         "related_laws": clean_text(d.get("cpws_al_glsy", "")),
-        "url": f"{BASE_URL}/view/content.html?id={gid}",
+        "url": f"{BASE_URL}/view/content.html?id={urllib.parse.quote(gid)}",
     }
 
     if not no_cache:

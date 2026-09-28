@@ -107,3 +107,54 @@ def test_rmfyalk_detail_success():
         assert detail["facts"] == "基本案情事实..."
         assert detail["reasoning"] == "裁判理由说理..."
         assert detail["ruling"] == "裁判结果判决..."
+
+
+def test_rmfyalk_search_case_no_advance():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"code": "0", "data": {"total": 0, "rows": []}}
+
+    with patch("rmfyalk_crawler.http_request", return_value=mock_response) as mock_http:
+        rmfyalk_crawler.search_cases(
+            keyword="2023-07-2-127-001",
+            token="mock-token",
+            no_cache=True,
+        )
+        payload = mock_http.call_args[1].get("json", {})
+        sp = payload.get("searchParams", {})
+        assert sp.get("isAdvSearch") == "1"
+        assert sp.get("cpws_al_no") == "2023-07-2-127-001"
+
+
+def test_rmfyalk_search_court_no_advance():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"code": "0", "data": {"total": 0, "rows": []}}
+
+    with patch("rmfyalk_crawler.http_request", return_value=mock_response) as mock_http:
+        rmfyalk_crawler.search_cases(
+            keyword="（2021）最高法民终1203号",
+            token="mock-token",
+            no_cache=True,
+        )
+        payload = mock_http.call_args[1].get("json", {})
+        sp = payload.get("searchParams", {})
+        assert sp.get("isAdvSearch") == "1"
+        assert sp.get("cpws_al_ajzh") == "（2021）最高法民终1203号"
+
+
+def test_rmfyalk_detail_resolve_case_no_not_found():
+    with patch("rmfyalk_crawler.search_cases", return_value={"records": []}):
+        res = rmfyalk_crawler.fetch_case_detail(
+            case_id="2024-99-9-999-999",
+            token="mock-token",
+            no_cache=True,
+        )
+        assert res["error"] == "CASE_NOT_FOUND"
+        assert "未在人民法院案例库中找到案号" in res["message"]
+
+
+def test_rmfyalk_detail_empty_case_id():
+    res = rmfyalk_crawler.fetch_case_detail(case_id="", token="mock-token")
+    assert res["error"] == "INVALID_ARGUMENT"
+

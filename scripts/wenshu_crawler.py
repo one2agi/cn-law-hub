@@ -163,8 +163,6 @@ def _build_headers(
     elif active_token:
         if "Bearer " in active_token:
             headers["Authorization"] = active_token
-        elif len(active_token) == 36 and "-" in active_token:
-            headers["Cookie"] = f"SESSION={active_token}"
         else:
             headers["Authorization"] = f"Bearer {active_token}"
 
@@ -221,7 +219,14 @@ def search_cases(
     # Build form payload for rest.q4w with dynamic ciphertext
     # Wenshu backend requires pageSize to be 5 or 10
     api_size = 5 if size <= 5 else 10
-    cond = [{"key": "s1", "value": keyword}] if keyword else []
+    kw_str = str(keyword or "").strip()
+    is_court_no = "号" in kw_str and any(c in kw_str for c in ["（", "）", "(", ")", "民", "刑", "行", "执", "再", "终", "初"])
+    if is_court_no:
+        cond = [{"key": "s7", "value": kw_str}]
+    elif kw_str:
+        cond = [{"key": "s1", "value": kw_str}]
+    else:
+        cond = []
     payload = {
         "sortFields": "s50:desc",
         "ciphertext": _generate_ciphertext(),
@@ -305,6 +310,15 @@ def search_cases(
             data = json.loads(decrypted_str)
         except Exception as e:
             _logger.warning("Failed to decrypt wenshu search response: %s", e)
+            return {
+                "source": "wenshu",
+                "keyword": keyword,
+                "total": 0,
+                "count": 0,
+                "records": [],
+                "error": "DECRYPTION_FAILED",
+                "message": f"裁判文书网返回了加密响应，但解密失败（{e}）。建议更新 Cookie/Session 后重试。\n{WENSHU_HELP_MSG}",
+            }
 
     raw_list = []
     total = 0
@@ -395,7 +409,10 @@ def fetch_case_detail(
     Returns:
         Dict with full judgement content.
     """
-    clean_id = doc_id
+    clean_id = str(doc_id or "").strip()
+    if not clean_id:
+        return {"source": "wenshu", "doc_id": "", "error": "INVALID_ARGUMENT", "message": "doc_id is required"}
+
     if "docId=" in clean_id:
         m = re.search(r"docId=([a-zA-Z0-9_-]+)", clean_id)
         if m:
@@ -495,7 +512,7 @@ def fetch_case_detail(
         "judge_date": raw.get("s31") or raw.get("judge_date", ""),
         "case_type": raw.get("s8") or raw.get("case_type", ""),
         "procedure": raw.get("s9") or raw.get("procedure", ""),
-        "key_points": clean_text(raw.get("s26") or raw.get("key_points", "")),
+        "key_points": clean_text(raw.get("key_points") or raw.get("裁判要旨", "")),
         "facts": clean_text(raw.get("s25") or raw.get("facts", "")),
         "reasoning": clean_text(raw.get("s26") or raw.get("reasoning", "")),
         "ruling": clean_text(raw.get("s27") or raw.get("ruling", "")),

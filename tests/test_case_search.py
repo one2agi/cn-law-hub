@@ -75,3 +75,37 @@ def test_case_search_court_guiding_detail():
         assert detail["key_points"] == "这是裁判要点文本。"
         assert detail["facts"] == "这是基本案情文本。"
         assert detail["reasoning"] == "这是裁判理由文本。"
+
+
+def test_case_search_court_guiding_ssrf_protection():
+    # Attempting to fetch internal or non-court URLs should be blocked immediately
+    res1 = case_search.fetch_court_guiding_detail("http://127.0.0.1:8000/internal-secrets")
+    assert res1["error"].startswith("INVALID_URL")
+
+    res2 = case_search.fetch_court_guiding_detail("https://attacker.example.com/exploit")
+    assert res2["error"].startswith("INVALID_URL")
+
+
+def test_case_search_court_guiding_cai_pan_yao_zhi():
+    mock_html = """
+    <html>
+      <body>
+        <h2>指导性案例201号：合同要旨案</h2>
+        <div class="txt_txt">
+          【裁判要旨】
+          裁判要旨内容说明。
+          【基本案情】
+          案情内容。
+        </div>
+      </body>
+    </html>
+    """
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.text = mock_html
+
+    with patch("case_search.http_request", return_value=mock_resp):
+        detail = case_search.fetch_court_guiding_detail("https://www.court.gov.cn/shenpan/xiangqing/201.html")
+        assert detail["key_points"] == "裁判要旨内容说明。"
+        assert detail["facts"] == "案情内容。"
+

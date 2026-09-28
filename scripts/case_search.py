@@ -26,6 +26,7 @@ import argparse
 import json
 import re
 import sys
+import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
@@ -190,9 +191,17 @@ def fetch_court_guiding_detail(url_or_id: str, no_cache: bool = False) -> Dict[s
     if BeautifulSoup is None:
         return {"error": "MISSING_DEPENDENCY: please run 'pip install beautifulsoup4'"}
 
-    full_url = url_or_id
-    if not full_url.startswith("http"):
-        full_url = f"{COURT_BASE_URL}/shenpan/xiangqing/{url_or_id}.html"
+    clean_id = str(url_or_id or "").strip()
+    if not clean_id:
+        return {"error": "INVALID_ARGUMENT: url_or_id is required"}
+
+    if clean_id.startswith("http://") or clean_id.startswith("https://"):
+        parsed = urllib.parse.urlparse(clean_id)
+        if parsed.netloc.lower() not in {"court.gov.cn", "www.court.gov.cn"}:
+            return {"error": f"INVALID_URL: Only court.gov.cn domains are permitted (got {parsed.netloc})"}
+        full_url = clean_id
+    else:
+        full_url = f"{COURT_BASE_URL}/shenpan/xiangqing/{clean_id}.html"
 
     cache_key = _cache._key("guiding_detail", full_url)
     if not no_cache:
@@ -227,13 +236,13 @@ def fetch_court_guiding_detail(url_or_id: str, no_cache: bool = False) -> Dict[s
     facts = ""
     reasoning = ""
 
-    heading_pattern = r"(?:【|(?:\n|^)\s*)(裁判要点|基本案情|裁判理由|相关法条|裁判结果)(?:】|[:：]|\n|\s)"
+    heading_pattern = r"(?:【|(?:\n|^)\s*)(裁判要点|裁判要旨|基本案情|裁判理由|相关法条|裁判结果)(?:】|[:：]|\n|\s)"
     parts = re.split(heading_pattern, full_text)
     if len(parts) > 1:
         for i in range(1, len(parts), 2):
             tag = parts[i]
             val = clean_text(parts[i + 1]) if i + 1 < len(parts) else ""
-            if tag == "裁判要点":
+            if tag in {"裁判要点", "裁判要旨"}:
                 key_points = val
             elif tag == "基本案情":
                 facts = val
@@ -449,7 +458,7 @@ def main():
         return
 
     # Handle search request
-    if args.search is not None or (not args.info and not args.set_token and not args.clear_token):
+    if args.search is not None:
         kw = args.search or ""
         result = search_cases(
             source=args.source,
