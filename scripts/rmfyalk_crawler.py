@@ -9,7 +9,9 @@ RMFYALK_TOKEN environment variable, or stored in ~/.config/cn-law-hub/config.jso
 
 import argparse
 import json
+import re
 import sys
+import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -126,18 +128,41 @@ def search_cases(
             except Exception:
                 pass
 
-    payload = {
-        "page": page,
-        "size": size,
-        "lib": "qb",
-        "searchParams": {
+    kw_clean = keyword.strip() if keyword else ""
+    is_case_no = bool(re.match(r"^\d{4}(-\d+)+$", kw_clean))
+    is_court_no = "号" in kw_clean and any(c in kw_clean for c in ["（", "）", "(", ")", "民", "刑", "行", "执", "再", "终", "初"])
+
+    if is_case_no:
+        search_params = {
+            "userSearchType": 1,
+            "isAdvSearch": "1",
+            "lib": lib,
+            "sort_field": "",
+            "cpws_al_no": kw_clean,
+        }
+    elif is_court_no:
+        search_params = {
+            "userSearchType": 1,
+            "isAdvSearch": "1",
+            "lib": lib,
+            "sort_field": "",
+            "cpws_al_ajzh": kw_clean,
+        }
+    else:
+        search_params = {
             "userSearchType": 1,
             "isAdvSearch": "0",
             "selectValue": ["qw"],
             "lib": lib,
             "sort_field": "",
-            "keyTitle": [keyword] if keyword else [],
-        },
+            "keyTitle": [kw_clean] if kw_clean else [],
+        }
+
+    payload = {
+        "page": page,
+        "size": size,
+        "lib": "qb",
+        "searchParams": search_params,
     }
 
     try:
@@ -202,7 +227,9 @@ def search_cases(
 
     records = []
     for row in raw_rows:
-        gid = row.get("id") or row.get("cpws_al_id") or row.get("gid", "")
+        raw_id = row.get("id") or row.get("cpws_al_id") or row.get("gid", "")
+        gid = urllib.parse.unquote(str(raw_id)) if raw_id else ""
+        quoted_id = urllib.parse.quote(gid) if gid else ""
         title = clean_text(row.get("cpws_al_title") or row.get("title", ""))
         case_no = row.get("cpws_al_no", "")
         court_case_no = row.get("cpws_al_ajzh", "")
@@ -213,7 +240,7 @@ def search_cases(
         keywords = ", ".join(raw_kw) if isinstance(raw_kw, list) else str(raw_kw)
         key_points = clean_text(row.get("cpws_al_cpyz") or row.get("cpws_al_cpyt", ""))
         lib_type = row.get("lib", "参考案例")
-        detail_url = f"{BASE_URL}/view/content.html?id={gid}&lib={lib}" if gid else ""
+        detail_url = f"{BASE_URL}/view/content.html?id={quoted_id}&lib={lib}" if quoted_id else ""
         records.append({
             "source": "rmfyalk",
             "gid": gid,
@@ -228,6 +255,22 @@ def search_cases(
             "lib_type": lib_type,
             "url": detail_url,
         })
+
+    if not records and " " in keyword.strip():
+        primary_kw = keyword.strip().split()[0]
+        if primary_kw and primary_kw != keyword.strip():
+            fallback_res = search_cases(
+                keyword=primary_kw,
+                token=token,
+                page=page,
+                size=size,
+                lib=lib,
+                session=sess,
+                no_cache=no_cache,
+            )
+            if fallback_res.get("records"):
+                fallback_res["keyword"] = keyword
+                return fallback_res
 
     result = {
         "source": "rmfyalk",
@@ -262,14 +305,25 @@ def fetch_case_detail(
     Returns:
         Dict with full case metadata and text sections.
     """
-    gid = case_id
+    raw_case_id = str(case_id).strip()
+    gid = urllib.parse.unquote(raw_case_id)
     if "id=" in gid:
-        # Extract gid from URL query parameter
-        import urllib.parse
         parsed = urllib.parse.urlparse(gid)
         q = urllib.parse.parse_qs(parsed.query)
         if "id" in q:
-            gid = q["id"][0]
+            gid = urllib.parse.unquote(q["id"][0])
+
+    # If gid is not a 44-character Base64 hash (e.g. is an in-library case_no or court case number)
+    if not (len(gid) == 44 and gid.endswith("=")) and ("-" in gid or "号" in gid):
+        search_res = search_cases(
+            keyword=gid,
+            token=token,
+            session=session,
+            no_cache=no_cache,
+            size=1,
+        )
+        if search_res.get("records"):
+            gid = search_res["records"][0]["gid"]
 
     sess = session or _get_session()
     headers = _build_headers(token=token)
