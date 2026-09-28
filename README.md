@@ -222,6 +222,25 @@ python scripts/article_search.py "违约金" --range content --max-laws 5 --offs
 python scripts/article_search.py "违约金" --range content --max-laws 5 --resume
 ```
 
+### 司法案例检索 (CaseGateway)
+
+统一整合人民法院案例库 (`rmfyalk`)、中国裁判文书网 (`wenshu`) 及最高法公开指导案例 (`court_guiding`)，具备智能凭证感知与自动兜底降级能力：
+
+```bash
+# 智能自动选源与兜底（未配置 Token 时自动降级至公开指导案例并提示配置）
+python scripts/case_search.py --source auto -s "民间借贷" --size 5
+
+# 免密直接检索最高法指导性案例
+python scripts/case_search.py --source court_guiding -s "著作权" --size 5
+
+# 通过案例 URL 或编号智能路由获取详情
+python scripts/case_search.py --source auto --info "https://www.court.gov.cn/shenpan/xiangqing/490521.html"
+
+# 持久化配置案例库凭证
+python scripts/case_search.py --set-token rmfyalk "<Token>"
+python scripts/case_search.py --set-token wenshu "<Cookie>"
+```
+
 ### 智能限速与缓存
 
 ```bash
@@ -339,7 +358,12 @@ cn-law-hub/
 │   │   ├── file_io.py            # 文件读写
 │   │   ├── logger.py             # 日志
 │   │   ├── ratelimit.py          # HTTP 客户端与智能限速
-│   │   └── text_utils.py         # 文本清洗与工具函数
+│   ├── case_gateway/             # 统一案例网关（领域契约、适配器模型、智能降级）
+│   │   ├── contracts.py          # 规范化领域契约（CaseRecord, CaseDetail 等）
+│   │   ├── gateway.py            # CaseGateway 核心引擎
+│   │   ├── provider.py           # CaseProvider 抽象接口
+│   │   └── providers/            # 案例库适配器 (rmfyalk, wenshu, court_guiding)
+│   ├── case_search.py            # 统一案例搜索 CLI 与路由分发
 │   ├── download.py               # NPC 搜索、下载、导出 URL、预览/查询法条
 │   ├── article_search.py         # NPC 跨法规法条级关键词搜索
 │   ├── gov_rules_crawler.py      # 国家规章库爬虫

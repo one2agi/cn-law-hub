@@ -66,17 +66,28 @@ For cross-law article search, use `scripts/article_search.py <keyword> --max-law
 
 ## Case Search & Token Configuration (司法案例检索与凭证配置)
 
-Use `scripts/case_search.py` or MCP tools `search_cases` / `get_case_detail`:
+Use `scripts/case_search.py`, `scripts/case_gateway/`, or MCP tools `search_cases` / `get_case_detail`:
 
+- **自动选择与无缝降级 (source="auto" / fallback)**:
+  - 默认优先调用人民法院案例库（rmfyalk）。
+  - 若用户未配置 Token，或遇到认证过期，系统将**自动优雅兜底降级至公开免密的最高法指导性案例**并附带友好配置指引，无需手动切换，杜绝程序异常中断。
+  - 支持传入 `--no-fallback` 严格禁用降级。
 - **最高法指导案例 (court_guiding)**: 免密零门槛公开，直接检索 1~279+ 号指导性案例。
-  `python scripts/case_search.py --source court_guiding --search "民间借贷" --size 5`
-- **人民法院案例库 (rmfyalk)**: 最高法 5,500+ 精选参考案例，需配置 `faxin-cpws-al-token`。
+  `python scripts/case_search.py --source court_guiding --search "著作权" --size 5`
+- **人民法院案例库 (rmfyalk)**: 最高法精选参考案例，需配置 `faxin-cpws-al-token`。
   1. 登录 `https://rmfyalk.court.gov.cn`
   2. 控制台运行：`fetch('/cpws_al_api/api/user/getUserInfo',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.json()).then(d=>console.log(d.data.alUser.userToken))`
   3. 保存凭证：`python scripts/case_search.py --set-token rmfyalk <Token>`
 - **中国裁判文书网 (wenshu)**: 全量文书大库，需配置 Cookie。
   1. 登录 `https://wenshu.court.gov.cn`，F12 开发者工具 Network 面板复制 Cookie
   2. 保存凭证：`python scripts/case_search.py --set-token wenshu "<Cookie>"`
+- **Python / 深度模块调用**:
+  ```python
+  from case_gateway import CaseGateway
+  gw = CaseGateway()
+  result = gw.search("借款合同", source="auto")
+  detail = gw.get_detail("https://www.court.gov.cn/shenpan/xiangqing/490521.html")
+  ```
 
 ## Legal Citation Standard (裁判文书规范引用)
 
