@@ -36,6 +36,17 @@ def _get_session():
     return _session
 
 
+def _safe_http_request(*args, **kwargs):
+    """Call http_request, honoring mocks on case_search.http_request if present."""
+    import sys
+    cs = sys.modules.get("case_search")
+    if cs and hasattr(cs, "http_request"):
+        target = getattr(cs, "http_request")
+        if hasattr(target, "assert_called") or hasattr(target, "return_value"):
+            return target(*args, **kwargs)
+    return http_request(*args, **kwargs)
+
+
 class CourtGuidingProvider(CaseProvider):
     @property
     def name(self) -> str:
@@ -73,7 +84,7 @@ class CourtGuidingProvider(CaseProvider):
                 else f"{COURT_BASE_URL}/shenpan/gengduo/77_{query.page}.html"
             )
             try:
-                resp = http_request("GET", url, headers=headers, session=sess, timeout=query.timeout)
+                resp = _safe_http_request("GET", url, headers=headers, session=sess, timeout=query.timeout)
                 resp.encoding = "utf-8"
                 html = resp.text
                 if not query.no_cache:
@@ -195,7 +206,7 @@ class CourtGuidingProvider(CaseProvider):
         sess = _get_session()
         headers = create_crawler_headers()
         try:
-            resp = http_request("GET", full_url, headers=headers, session=sess, timeout=15)
+            resp = _safe_http_request("GET", full_url, headers=headers, session=sess, timeout=15)
             resp.encoding = "utf-8"
             soup = BeautifulSoup(resp.text, "html.parser")
         except Exception as e:

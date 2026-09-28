@@ -109,3 +109,38 @@ def test_case_search_court_guiding_cai_pan_yao_zhi():
         assert detail["key_points"] == "裁判要旨内容说明。"
         assert detail["facts"] == "案情内容。"
 
+
+def test_case_search_router_backward_compatibility():
+    with patch("case_search._gateway.search") as mock_gw_search:
+        from case_gateway.contracts import CaseSearchResult, CaseRecord
+        mock_gw_search.return_value = CaseSearchResult(
+            source="rmfyalk",
+            query="借贷",
+            page=1,
+            size=10,
+            total=1,
+            count=1,
+            records=[CaseRecord(id="g1", source="rmfyalk", title="借贷案", case_no="2024-1")],
+        )
+        res = case_search.search_cases(source="rmfyalk", keyword="借贷")
+        assert res["source"] == "rmfyalk"
+        assert res["keyword"] == "借贷"
+        assert res["count"] == 1
+        assert res["records"][0]["gid"] == "g1"
+        assert res["records"][0]["title"] == "借贷案"
+
+
+def test_case_detail_router_backward_compatibility():
+    with patch("case_search._gateway.get_detail") as mock_gw_detail:
+        from case_gateway.contracts import CaseDetail
+        mock_gw_detail.return_value = CaseDetail(
+            id="g1",
+            source="rmfyalk",
+            title="借贷案详情",
+            key_points="要点",
+        )
+        res = case_search.get_case_detail(source="rmfyalk", case_id="g1")
+        assert res["gid"] == "g1"
+        assert res["title"] == "借贷案详情"
+        assert res["key_points"] == "要点"
+

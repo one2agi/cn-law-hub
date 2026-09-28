@@ -75,6 +75,11 @@ def _get_session():
     return _session
 
 
+from case_gateway import get_default_gateway
+
+_gateway = get_default_gateway()
+
+
 # ---------------------------------------------------------------------------
 # court_guiding (最高法公开指导性案例 - 免密)
 # ---------------------------------------------------------------------------
@@ -87,7 +92,8 @@ def fetch_court_guiding_cases(
     no_cache: bool = False,
 ) -> Dict[str, Any]:
     """Fetch Supreme People's Court Guiding Cases (court.gov.cn/shenpan/gengduo/77.html)."""
-    if BeautifulSoup is None:
+    provider = _gateway.get_provider("court_guiding")
+    if not provider:
         return {
             "source": "court_guiding",
             "keyword": keyword,
@@ -96,175 +102,25 @@ def fetch_court_guiding_cases(
             "records": [],
             "error": "MISSING_DEPENDENCY: please run 'pip install beautifulsoup4'",
         }
+    from case_gateway.contracts import CaseQuery
 
-    sess = _get_session()
-    headers = create_crawler_headers()
-    cache_key = _cache._key("guiding_list", str(page))
-
-    html = None
-    if not no_cache:
-        cached = _cache.get(cache_key, max_age=86400)
-        if cached:
-            html = cached
-
-    if not html:
-        url = (
-            f"{COURT_BASE_URL}/shenpan/gengduo/77.html"
-            if page == 1
-            else f"{COURT_BASE_URL}/shenpan/gengduo/77_{page}.html"
-        )
-        try:
-            resp = http_request("GET", url, headers=headers, session=sess, timeout=15)
-            resp.encoding = "utf-8"
-            html = resp.text
-            if not no_cache:
-                _cache.set(cache_key, html)
-        except Exception as e:
-            return {
-                "source": "court_guiding",
-                "keyword": keyword,
-                "total": 0,
-                "count": 0,
-                "records": [],
-                "error": f"REQUEST_FAILED: {e}",
-            }
-
-    soup = BeautifulSoup(html, "html.parser")
-    records = []
-    seen_urls = set()
-
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        if "/shenpan/xiangqing/" not in href:
-            continue
-        title = clean_text(a.get("title") or a.get_text(" ", strip=True))
-        if not title or len(title) < 5:
-            continue
-
-        full_url = urljoin(COURT_BASE_URL, href)
-        if full_url in seen_urls:
-            continue
-        seen_urls.add(full_url)
-
-        # Extract date from adjacent <i> or sibling
-        date_str = ""
-        parent = a.parent
-        if parent:
-            i_tag = parent.find("i", class_="date")
-            if i_tag:
-                date_str = clean_text(i_tag.get_text())
-
-        # Filter by keyword if provided
-        if keyword and keyword.lower() not in title.lower():
-            continue
-
-        # Extract guiding case number if present (e.g. 指导性案例279号)
-        m = re.search(r"指导(?:性)?案例\s*(\d+)号", title)
-        case_no = f"指导性案例{m.group(1)}号" if m else ""
-
-        records.append({
-            "source": "court_guiding",
-            "title": title,
-            "case_no": case_no,
-            "court": "最高人民法院",
-            "judge_date": date_str,
-            "case_type": "指导性案例",
-            "url": full_url,
-        })
-
-    # Slice page size
-    sliced_records = records[:size]
-
-    return {
-        "source": "court_guiding",
-        "keyword": keyword,
-        "page": page,
-        "size": size,
-        "total": len(records),
-        "count": len(sliced_records),
-        "records": sliced_records,
-    }
+    q = CaseQuery(keyword=keyword, page=page, size=size, no_cache=no_cache)
+    res = provider.search(q)
+    return res.to_legacy_dict()
 
 
 def fetch_court_guiding_detail(url_or_id: str, no_cache: bool = False) -> Dict[str, Any]:
     """Fetch full text of a Supreme Court Guiding Case from court.gov.cn."""
-    if BeautifulSoup is None:
+    provider = _gateway.get_provider("court_guiding")
+    if not provider:
         return {"error": "MISSING_DEPENDENCY: please run 'pip install beautifulsoup4'"}
+    from case_gateway.contracts import CaseQuery
 
-    clean_id = str(url_or_id or "").strip()
-    if not clean_id:
-        return {"error": "INVALID_ARGUMENT: url_or_id is required"}
-
-    if clean_id.startswith("http://") or clean_id.startswith("https://"):
-        parsed = urllib.parse.urlparse(clean_id)
-        if parsed.netloc.lower() not in {"court.gov.cn", "www.court.gov.cn"}:
-            return {"error": f"INVALID_URL: Only court.gov.cn domains are permitted (got {parsed.netloc})"}
-        full_url = clean_id
-    else:
-        full_url = f"{COURT_BASE_URL}/shenpan/xiangqing/{clean_id}.html"
-
-    cache_key = _cache._key("guiding_detail", full_url)
-    if not no_cache:
-        cached = _cache.get(cache_key, max_age=86400 * 7)
-        if cached:
-            try:
-                return json.loads(cached)
-            except Exception:
-                pass
-
-    sess = _get_session()
-    headers = create_crawler_headers()
-    try:
-        resp = http_request("GET", full_url, headers=headers, session=sess, timeout=15)
-        resp.encoding = "utf-8"
-        soup = BeautifulSoup(resp.text, "html.parser")
-    except Exception as e:
-        return {"error": f"REQUEST_FAILED: {e}"}
-
-    title_tag = soup.find("h2") or soup.find("title")
-    title = clean_text(title_tag.get_text()) if title_tag else ""
-    title = re.sub(r"\s*-\s*中华人民共和国最高人民法院.*$", "", title)
-
-    m = re.search(r"指导(?:性)?案例\s*(\d+)号", title)
-    case_no = f"指导性案例{m.group(1)}号" if m else ""
-
-    body_tag = soup.find(class_="txt_txt") or soup.find(class_="txt")
-    full_text = clean_text(body_tag.get_text("\n")) if body_tag else ""
-
-    # Parse common sections
-    key_points = ""
-    facts = ""
-    reasoning = ""
-
-    heading_pattern = r"(?:【|(?:\n|^)\s*)(裁判要点|裁判要旨|基本案情|裁判理由|相关法条|裁判结果)(?:】|[:：]|\n|\s)"
-    parts = re.split(heading_pattern, full_text)
-    if len(parts) > 1:
-        for i in range(1, len(parts), 2):
-            tag = parts[i]
-            val = clean_text(parts[i + 1]) if i + 1 < len(parts) else ""
-            if tag in {"裁判要点", "裁判要旨"}:
-                key_points = val
-            elif tag == "基本案情":
-                facts = val
-            elif tag == "裁判理由":
-                reasoning = val
-
-    record = {
-        "source": "court_guiding",
-        "title": title,
-        "case_no": case_no,
-        "court": "最高人民法院",
-        "url": full_url,
-        "key_points": key_points,
-        "facts": facts,
-        "reasoning": reasoning,
-        "full_text": full_text,
-    }
-
-    if not no_cache:
-        _cache.set(cache_key, json.dumps(record, ensure_ascii=False))
-
-    return record
+    q = CaseQuery(no_cache=no_cache)
+    detail = provider.get_detail(url_or_id, query=q)
+    if detail.extra and "error" in detail.extra:
+        return {"error": detail.extra["error"]}
+    return detail.to_legacy_dict()
 
 
 # ---------------------------------------------------------------------------
@@ -281,11 +137,12 @@ def search_cases(
     size: int = 10,
     lib: str = "cpwsAl_qb",
     no_cache: bool = False,
+    fallback: bool = True,
 ) -> Dict[str, Any]:
     """Unified case search router across all supported sources.
 
     Args:
-        source: 'rmfyalk' (人民法院案例库), 'wenshu' (中国裁判文书网), 'court_guiding' (最高法指导案例).
+        source: 'rmfyalk' (人民法院案例库), 'wenshu' (中国裁判文书网), 'court_guiding' (最高法指导案例), 'auto'.
         keyword: Search query.
         token: Optional explicit token.
         cookie: Optional explicit cookie.
@@ -293,41 +150,20 @@ def search_cases(
         size: Result limit.
         lib: Case category filter for rmfyalk.
         no_cache: Bypass cache.
+        fallback: Enable graceful degradation when unauthenticated.
     """
-    src = source.lower().strip()
-    if src in ("rmfyalk", "case_db", "al", "alk"):
-        return rmfyalk_crawler.search_cases(
-            keyword=keyword,
-            token=token,
-            page=page,
-            size=size,
-            lib=lib,
-            no_cache=no_cache,
-        )
-    elif src in ("wenshu", "cpws", "judgements"):
-        return wenshu_crawler.search_cases(
-            keyword=keyword,
-            token=token,
-            cookie=cookie,
-            page=page,
-            size=size,
-            no_cache=no_cache,
-        )
-    elif src in ("court_guiding", "guiding", "zdxal"):
-        return fetch_court_guiding_cases(
-            keyword=keyword,
-            page=page,
-            size=size,
-            no_cache=no_cache,
-        )
-    else:
-        return {
-            "source": source,
-            "error": "UNKNOWN_SOURCE",
-            "message": f"不支持的案例库来源: '{source}'. 支持的选项: rmfyalk (人民法院案例库), wenshu (中国裁判文书网), court_guiding (最高法指导案例)",
-            "records": [],
-            "count": 0,
-        }
+    res = _gateway.search(
+        query=keyword,
+        source=source,
+        token=token,
+        cookie=cookie,
+        page=page,
+        size=size,
+        lib=lib,
+        no_cache=no_cache,
+        fallback=fallback,
+    )
+    return res.to_legacy_dict()
 
 
 def get_case_detail(
@@ -338,30 +174,16 @@ def get_case_detail(
     no_cache: bool = False,
 ) -> Dict[str, Any]:
     """Unified case detail router."""
-    src = source.lower().strip()
-    if src in ("rmfyalk", "case_db", "al", "alk"):
-        return rmfyalk_crawler.fetch_case_detail(
-            case_id=case_id,
-            token=token,
-            no_cache=no_cache,
-        )
-    elif src in ("wenshu", "cpws", "judgements"):
-        return wenshu_crawler.fetch_case_detail(
-            doc_id=case_id,
-            token=token,
-            cookie=cookie,
-            no_cache=no_cache,
-        )
-    elif src in ("court_guiding", "guiding", "zdxal"):
-        return fetch_court_guiding_detail(
-            url_or_id=case_id,
-            no_cache=no_cache,
-        )
-    else:
-        return {
-            "error": "UNKNOWN_SOURCE",
-            "message": f"不支持的案例库来源: '{source}'.",
-        }
+    detail = _gateway.get_detail(
+        case_id=case_id,
+        source=source,
+        token=token,
+        cookie=cookie,
+        no_cache=no_cache,
+    )
+    if detail.extra and "error" in detail.extra:
+        return {"source": source, "case_id": case_id, **detail.extra}
+    return detail.to_legacy_dict()
 
 
 # ---------------------------------------------------------------------------
@@ -376,9 +198,9 @@ def main():
     )
     parser.add_argument(
         "--source",
-        choices=["rmfyalk", "wenshu", "court_guiding"],
+        choices=["rmfyalk", "wenshu", "court_guiding", "auto"],
         default="rmfyalk",
-        help="案例数据源: rmfyalk (人民法院案例库), wenshu (中国裁判文书网), court_guiding (最高法指导案例)",
+        help="案例数据源: rmfyalk (人民法院案例库), wenshu (中国裁判文书网), court_guiding (最高法指导案例), auto (自动首选)",
     )
     parser.add_argument("-s", "--search", help="检索关键词（如'民间借贷'、'保证人追偿权'）")
     parser.add_argument("--info", help="查看指定案例详情（传入案例 GID / DocId 或页面 URL）")
@@ -391,6 +213,7 @@ def main():
     parser.add_argument("--clear-token", metavar="SOURCE", help="清除本地保存的凭证 (例: --clear-token rmfyalk)")
     parser.add_argument("-o", "--output", help="输出结果文件路径 (.json, .jsonl, .md)")
     parser.add_argument("--no-cache", action="store_true", help="忽略本地缓存")
+    parser.add_argument("--no-fallback", action="store_true", help="禁用未认证时的自动兜底降级")
 
     args = parser.parse_args()
 
@@ -468,7 +291,11 @@ def main():
             page=args.page,
             size=args.size,
             no_cache=args.no_cache,
+            fallback=not args.no_fallback,
         )
+
+        if result.get("warning"):
+            print(f"⚠️  {result['warning']}\n")
 
         if result.get("error"):
             print(f"❌ 检索失败 [{result.get('error')}]:")
@@ -479,7 +306,7 @@ def main():
         records = result.get("records", [])
         total = result.get("total", 0)
         kw_display = f"'{kw}'" if kw else "全部/最新"
-        print(f"\n🔍 检索来源: {args.source} | 关键词: {kw_display} | 命中数: {total} | 当前展示: {len(records)} 篇\n")
+        print(f"\n🔍 检索来源: {result.get('source', args.source)} | 关键词: {kw_display} | 命中数: {total} | 当前展示: {len(records)} 篇\n")
 
         for idx, r in enumerate(records, 1):
             title = r.get("title", "未命名案例")
