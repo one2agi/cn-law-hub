@@ -406,6 +406,12 @@ def search_cases(
         {"source", "keyword", "page", "size", "total", "count", "records": [...]}
     """
     try:
+        import importlib
+        import rmfyalk_crawler
+        import wenshu_crawler
+        importlib.reload(rmfyalk_crawler)
+        importlib.reload(wenshu_crawler)
+        importlib.reload(case_search)
         return case_search.search_cases(
             source=source,
             keyword=keyword,
@@ -438,6 +444,12 @@ def get_case_detail(
         and structured text sections (key_points, facts, reasoning, ruling/full_text).
     """
     try:
+        import importlib
+        import rmfyalk_crawler
+        import wenshu_crawler
+        importlib.reload(rmfyalk_crawler)
+        importlib.reload(wenshu_crawler)
+        importlib.reload(case_search)
         return case_search.get_case_detail(
             source=source,
             case_id=case_id,
