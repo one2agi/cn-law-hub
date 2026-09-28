@@ -140,7 +140,11 @@ class CaseGateway:
         res = provider.search(q)
 
         # Fallback on auth failure if enabled
-        if res.error in ("AUTHENTICATION_REQUIRED", "TOKEN_EXPIRED_OR_INVALID") and q.fallback and src != "court_guiding":
+        if (
+            res.error in ("AUTHENTICATION_REQUIRED", "TOKEN_EXPIRED_OR_INVALID", "AUTHENTICATION_FAILED", "AUTH_REQUIRED")
+            and q.fallback
+            and src != "court_guiding"
+        ):
             guiding = self._providers.get("court_guiding")
             if guiding:
                 _logger.info("Provider '%s' failed auth, falling back to 'court_guiding'", src)
@@ -177,6 +181,8 @@ class CaseGateway:
                 id=cid,
                 source=src,
                 title="",
+                error="UNKNOWN_SOURCE",
+                message=f"不支持的案例数据源: '{src}'",
                 extra={"error": "UNKNOWN_SOURCE", "message": f"不支持的案例数据源: '{src}'"},
             )
 
@@ -185,13 +191,14 @@ class CaseGateway:
 
     def _detect_source_from_id(self, cid: str) -> str:
         """Heuristically determine case source from ID or URL."""
-        if "court.gov.cn/shenpan/" in cid:
+        clean_cid = str(cid or "").strip()
+        if "court.gov.cn/shenpan/" in clean_cid or clean_cid.isdigit() or "指导" in clean_cid:
             return "court_guiding"
-        if "wenshu.court.gov.cn" in cid or "docId=" in cid:
+        if "wenshu.court.gov.cn" in clean_cid or "docId=" in clean_cid:
             return "wenshu"
-        if "rmfyalk.court.gov.cn" in cid:
+        if "rmfyalk.court.gov.cn" in clean_cid:
             return "rmfyalk"
-        if len(cid) == 44 and cid.endswith("="):
+        if len(clean_cid) == 44 and clean_cid.endswith("="):
             return "rmfyalk"
         # Default fallback to rmfyalk
         return "rmfyalk"

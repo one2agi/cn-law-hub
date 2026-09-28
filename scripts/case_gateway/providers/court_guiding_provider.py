@@ -147,6 +147,10 @@ class CourtGuidingProvider(CaseProvider):
                 )
             )
 
+        has_next_page = bool(
+            soup.find("a", string=re.compile(r"下一页|下页|>|»"))
+            or (len(records) > query.size)
+        )
         sliced_records = records[: query.size]
         return CaseSearchResult(
             source=self.name,
@@ -156,7 +160,7 @@ class CourtGuidingProvider(CaseProvider):
             total=len(records),
             count=len(sliced_records),
             records=sliced_records,
-            has_more=(query.page * query.size < len(records)),
+            has_more=has_next_page,
         )
 
     def get_detail(self, case_id: str, query: Optional[CaseQuery] = None) -> CaseDetail:

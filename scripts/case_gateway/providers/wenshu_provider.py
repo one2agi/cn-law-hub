@@ -26,6 +26,9 @@ class WenshuProvider(CaseProvider):
             no_cache=query.no_cache,
         )
         if raw.get("error"):
+            err = raw.get("error")
+            if err in ("AUTHENTICATION_FAILED", "AUTH_REQUIRED"):
+                err = "AUTHENTICATION_REQUIRED"
             return CaseSearchResult(
                 source=self.name,
                 query=query.keyword,
@@ -34,7 +37,7 @@ class WenshuProvider(CaseProvider):
                 total=0,
                 count=0,
                 records=[],
-                error=raw.get("error"),
+                error=err,
                 message=raw.get("message"),
             )
 

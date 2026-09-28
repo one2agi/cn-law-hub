@@ -395,7 +395,7 @@ def search_cases(
       - 'court_guiding': 最高人民法院指导案例 (https://www.court.gov.cn/shenpan/gengduo/77.html) - 免密公开，无需 Token。
 
     Args:
-        source: Data source ('rmfyalk' / 'wenshu' / 'court_guiding'). Default 'rmfyalk'.
+        source: Data source ('auto' / 'rmfyalk' / 'wenshu' / 'court_guiding'). Default 'rmfyalk'.
         keyword: Search keyword (e.g. "民间借贷" / "保证责任" / "虚拟货币").
         token: Optional explicit authentication token (overrides env/config).
         cookie: Optional explicit cookie (primarily for wenshu).

@@ -116,3 +116,66 @@ def test_error_hierarchy():
     assert err.source == "rmfyalk"
     assert err.error_code == "AUTHENTICATION_REQUIRED"
     assert "请配置Token" in str(err)
+
+
+def test_from_legacy_dict_roundtrip():
+    # CaseRecord roundtrip
+    rec = CaseRecord(
+        id="test_gid_888",
+        source="rmfyalk",
+        title="测试借贷案",
+        case_no="2024-02-1",
+        court_case_no="（2024）京01民初1号",
+        court="北京市第一中级人民法院",
+        judge_date="2024-01-01",
+        case_type="民事",
+        summary="民间借贷裁判要旨",
+        url="https://rmfyalk.court.gov.cn/888",
+    )
+    legacy_rec = rec.to_legacy_dict()
+    reconstructed_rec = CaseRecord.from_legacy_dict(legacy_rec)
+    assert reconstructed_rec.id == "test_gid_888"
+    assert reconstructed_rec.source == "rmfyalk"
+    assert reconstructed_rec.title == "测试借贷案"
+    assert reconstructed_rec.summary == "民间借贷裁判要旨"
+
+    # CaseDetail roundtrip
+    detail = CaseDetail(
+        id="doc_777",
+        source="wenshu",
+        title="详细判决",
+        case_no="（2023）沪01民终10号",
+        key_points="关键要点",
+        facts="查明事实",
+        error="TEST_ERROR",
+        message="Test Message",
+    )
+    legacy_detail = detail.to_legacy_dict()
+    assert legacy_detail["doc_id"] == "doc_777"
+    assert legacy_detail["error"] == "TEST_ERROR"
+    reconstructed_detail = CaseDetail.from_legacy_dict(legacy_detail)
+    assert reconstructed_detail.id == "doc_777"
+    assert reconstructed_detail.source == "wenshu"
+    assert reconstructed_detail.facts == "查明事实"
+    assert reconstructed_detail.error == "TEST_ERROR"
+
+    # CaseSearchResult roundtrip
+    search_res = CaseSearchResult(
+        source="rmfyalk",
+        query="民间借贷",
+        page=1,
+        size=10,
+        total=1,
+        count=1,
+        records=[rec],
+        degraded=True,
+        warning="Degraded mode active",
+    )
+    legacy_res = search_res.to_legacy_dict()
+    reconstructed_res = CaseSearchResult.from_legacy_dict(legacy_res)
+    assert reconstructed_res.source == "rmfyalk"
+    assert reconstructed_res.query == "民间借贷"
+    assert reconstructed_res.degraded is True
+    assert reconstructed_res.warning == "Degraded mode active"
+    assert len(reconstructed_res.records) == 1
+    assert reconstructed_res.records[0].id == "test_gid_888"

@@ -78,7 +78,26 @@ def test_gateway_id_auto_detection():
     detail_url = gw.get_detail("https://www.court.gov.cn/shenpan/xiangqing/123.html")
     assert detail_url.source == "court_guiding"
 
+    # Guiding case numeric ID (e.g. 490521)
+    detail_num = gw.get_detail("490521")
+    assert detail_num.source == "court_guiding"
+
+    # Guiding case title-like ID
+    detail_guid = gw.get_detail("指导性案例200号")
+    assert detail_guid.source == "court_guiding"
+
     # GID (44 chars Base64 hash)
     gid = "A" * 43 + "="
     detail_gid = gw.get_detail(gid)
     assert detail_gid.source == "rmfyalk"
+
+
+def test_gateway_wenshu_auth_failure_fallback():
+    gw = CaseGateway()
+    gw.register_provider("wenshu", FakeProvider("wenshu", available=False))
+    gw.register_provider("court_guiding", FakeProvider("court_guiding", available=True))
+
+    res = gw.search("借贷纠纷", source="wenshu", fallback=True)
+    assert res.degraded is True
+    assert res.source == "court_guiding"
+    assert "已自动为您兜底检索最高法公开指导性案例" in res.warning
