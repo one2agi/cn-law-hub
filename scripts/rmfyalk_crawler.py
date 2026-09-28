@@ -363,11 +363,12 @@ def fetch_case_detail(
                 pass
 
     try:
+        post_gid = urllib.parse.quote(urllib.parse.unquote(gid))
         resp = http_request(
             "POST",
             CONTENT_API,
             headers=headers,
-            json={"gid": gid},
+            json={"gid": post_gid},
             session=sess,
             timeout=15,
             allowed_statuses=(401, 403),
