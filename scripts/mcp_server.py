@@ -406,12 +406,14 @@ def search_cases(
         {"source", "keyword", "page", "size", "total", "count", "records": [...]}
     """
     try:
-        import importlib
-        import rmfyalk_crawler
-        import wenshu_crawler
-        importlib.reload(rmfyalk_crawler)
-        importlib.reload(wenshu_crawler)
-        importlib.reload(case_search)
+        import os
+        if os.getenv("CN_LAW_HUB_DEV_RELOAD", "").lower() in ("1", "true", "yes"):
+            import importlib
+            import rmfyalk_crawler
+            import wenshu_crawler
+            importlib.reload(rmfyalk_crawler)
+            importlib.reload(wenshu_crawler)
+            importlib.reload(case_search)
         return case_search.search_cases(
             source=source,
             keyword=keyword,
@@ -434,7 +436,7 @@ def get_case_detail(
     """Fetch full text, reasoning, and key points of a judicial case.
 
     Args:
-        source: Data source ('rmfyalk' / 'wenshu' / 'court_guiding').
+        source: Data source ('rmfyalk' / 'wenshu' / 'court_guiding' / 'auto').
         case_id: Case GID (for rmfyalk), DocId (for wenshu), or detail page URL.
         token: Optional explicit authentication token.
         cookie: Optional explicit cookie (for wenshu).
@@ -444,12 +446,14 @@ def get_case_detail(
         and structured text sections (key_points, facts, reasoning, ruling/full_text).
     """
     try:
-        import importlib
-        import rmfyalk_crawler
-        import wenshu_crawler
-        importlib.reload(rmfyalk_crawler)
-        importlib.reload(wenshu_crawler)
-        importlib.reload(case_search)
+        import os
+        if os.getenv("CN_LAW_HUB_DEV_RELOAD", "").lower() in ("1", "true", "yes"):
+            import importlib
+            import rmfyalk_crawler
+            import wenshu_crawler
+            importlib.reload(rmfyalk_crawler)
+            importlib.reload(wenshu_crawler)
+            importlib.reload(case_search)
         return case_search.get_case_detail(
             source=source,
             case_id=case_id,
