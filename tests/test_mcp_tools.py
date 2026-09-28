@@ -257,3 +257,42 @@ class TestFormatLegalCitationTool:
             result = mcp_server.format_legal_citation("bad", "0")
         assert "error" in result
 
+
+# ── search_cases & get_case_detail tools ─────────────────────────────────
+
+class TestSearchCasesTool:
+    def test_search_cases_routes_to_case_search(self):
+        with mock.patch.object(
+            mcp_server.case_search,
+            "search_cases",
+            return_value={"source": "rmfyalk", "records": [{"title": "案例1"}], "count": 1},
+        ) as sc:
+            result = mcp_server.search_cases(source="rmfyalk", keyword="借贷", token="test_token")
+        sc.assert_called_once_with(
+            source="rmfyalk",
+            keyword="借贷",
+            token="test_token",
+            cookie=None,
+            page=1,
+            size=10,
+        )
+        assert result["count"] == 1
+        assert result["records"][0]["title"] == "案例1"
+
+    def test_get_case_detail_routes_to_case_search(self):
+        with mock.patch.object(
+            mcp_server.case_search,
+            "get_case_detail",
+            return_value={"source": "rmfyalk", "title": "案例1", "key_points": "要点"},
+        ) as gd:
+            result = mcp_server.get_case_detail(source="rmfyalk", case_id="123", token="test_token")
+        gd.assert_called_once_with(
+            source="rmfyalk",
+            case_id="123",
+            token="test_token",
+            cookie=None,
+        )
+        assert result["title"] == "案例1"
+        assert result["key_points"] == "要点"
+
+

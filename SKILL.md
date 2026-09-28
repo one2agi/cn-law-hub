@@ -1,7 +1,7 @@
 ---
 name: cn-law-hub
 description: >-
-  用于查询、检索、核验、下载、导出、批量采集中国官方法律法规、规章、条约和具体法条。Use this skill aggressively when the user asks to 查法律、查法规、查条例、查规章、查条约、查法条、查第几条、找法律依据、引用法律依据、核验现行有效、判断是否废止/已修改/尚未生效、下载法规全文、导出法规目录、批量下载法规文件、按关键词检索具体法条、展开法条分析，或在中国法律咨询、案例分析、合规审查、合同审查、劳动争议、行政法分析、公司合规、数据合规、政策研究中需要调用、核验或引用中国现行有效法律法规原文作为依据。Trigger also when phrases such as 依法、依规、依照法律规定、法律法规 imply a need to verify specific statutory authority or article-level text. Covers 国家法律法规数据库 (flk.npc.gov.cn), 国家规章库 (gov.cn), 外交条约库 (treaty.mfa.gov.cn), 国务院政策文件库 (sousuo.www.gov.cn), 司法部行政法规库 (xzfg.moj.gov.cn), 党内法规库 (12371.cn), 国防部法规文库 (mod.gov.cn), 税务法规库 (fgk.chinatax.gov.cn), 生态环境部法规规章 (mee.gov.cn), and 最高人民法院发布栏目 (court.gov.cn). Supports 标题/正文检索, 精确/模糊检索, 时效性过滤, 分类过滤, 分页, 排序, 单篇下载, 批量下载, 法条级抽取, 地区/制定机关分类, and browser fallback. Trigger when the answer may depend on current effective Chinese statutes, regulations, rules, treaties, article text, official document status, or official source attribution. Do not use for purely general legal theory, generic writing, or legal reasoning that does not require retrieving or verifying official Chinese legal documents.
+  用于查询、检索、核验、下载、导出、批量采集中国官方法律法规、规章、条约、具体法条及司法裁判案例。Use this skill aggressively when the user asks to 查法律、查法规、查条例、查规章、查条约、查法条、查案例、查判例、裁判文书、指导性案例、参考案例、人民法院案例库、中国裁判文书网、找法律依据、引用法律依据、核验现行有效，或在诉讼代理、案情分析、法律咨询中调用权威案例和法条。
 ---
 
 # Data Sources
@@ -18,6 +18,9 @@ description: >-
 | 8 | **税务法规库** | `scripts/tax_law_crawler.py` | `fgk.chinatax.gov.cn` | REST API (POST) |
 | 9 | **生态环境部法规规章** | `scripts/mee_law_crawler.py` | `mee.gov.cn` | HTML |
 | 10 | **最高人民法院发布栏目** | `scripts/court_law_crawler.py` | `court.gov.cn` | HTML |
+| 11 | **人民法院案例库 (Case DB)** | `scripts/case_search.py --source rmfyalk` | `rmfyalk.court.gov.cn` | JSON API (Token) |
+| 12 | **中国裁判文书网 (Judgements)** | `scripts/case_search.py --source wenshu` | `wenshu.court.gov.cn` | HTTP API (Cookie/Token) |
+| 13 | **最高法指导案例 (Guiding Cases)** | `scripts/case_search.py --source court_guiding` | `court.gov.cn` | HTML (免密公开) |
 
 All scripts share `--search`, `--info`, `--size`, `--output`, `--rate-limit`, `--no-cache`, `--cache-stats`, `--cache-clear`. Run `python <script> --help` for full parameter lists.
 
@@ -60,6 +63,20 @@ For individual articles instead of full documents:
 Supports Chinese numerals (`第三十八条`), Arabic (`第38条`), or bare numbers (`38`).
 
 For cross-law article search, use `scripts/article_search.py <keyword> --max-laws N`.
+
+## Case Search & Token Configuration (司法案例检索与凭证配置)
+
+Use `scripts/case_search.py` or MCP tools `search_cases` / `get_case_detail`:
+
+- **最高法指导案例 (court_guiding)**: 免密零门槛公开，直接检索 1~279+ 号指导性案例。
+  `python scripts/case_search.py --source court_guiding --search "民间借贷" --size 5`
+- **人民法院案例库 (rmfyalk)**: 最高法 5,500+ 精选参考案例，需配置 `faxin-cpws-al-token`。
+  1. 登录 `https://rmfyalk.court.gov.cn`
+  2. 控制台运行：`fetch('/cpws_al_api/api/user/getUserInfo',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.json()).then(d=>console.log(d.data.alUser.userToken))`
+  3. 保存凭证：`python scripts/case_search.py --set-token rmfyalk <Token>`
+- **中国裁判文书网 (wenshu)**: 全量文书大库，需配置 Cookie。
+  1. 登录 `https://wenshu.court.gov.cn`，F12 开发者工具 Network 面板复制 Cookie
+  2. 保存凭证：`python scripts/case_search.py --set-token wenshu "<Cookie>"`
 
 ## Legal Citation Standard (裁判文书规范引用)
 

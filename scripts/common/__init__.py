@@ -9,6 +9,9 @@ DOCX/article extraction, Chinese numeral conversion, logger, CLI helpers.
 # Re-export cache
 from .cache import CacheManager, get_cache
 
+# Re-export credentials
+from .credentials import clear_credential, get_credential, set_credential
+
 # Re-export Chinese numeral conversion
 from .chinese_numerals import chinese_to_int, int_to_chinese
 

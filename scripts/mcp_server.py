@@ -31,6 +31,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from mcp.server.mcpserver import MCPServer  # noqa: E402
 
 import article_search as article_search_mod  # noqa: E402  (module alias: keeps the tool name free)
+import case_search  # noqa: E402
 import court_law_crawler  # noqa: E402
 import download  # noqa: E402
 import gov_policy_library  # noqa: E402
@@ -375,6 +376,76 @@ def format_legal_citation(
         return format_citation_helper(law_name, article, paragraph=paragraph, item=item)
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}
+
+
+@mcp.tool()
+def search_cases(
+    source: str = "rmfyalk",
+    keyword: str = "",
+    token: str | None = None,
+    cookie: str | None = None,
+    page: int = 1,
+    size: int = 10,
+) -> dict:
+    """Search public judicial cases and rulings across official databases.
+
+    Supported sources:
+      - 'rmfyalk': 人民法院案例库 (https://rmfyalk.court.gov.cn) - 需提供或配置 Token (faxin-cpws-al-token)。收录最高法权威指导性与参考案例。
+      - 'wenshu': 中国裁判文书网 (https://wenshu.court.gov.cn) - 需提供或配置 Token/Cookie。全国裁判文书大库。
+      - 'court_guiding': 最高人民法院指导案例 (https://www.court.gov.cn/shenpan/gengduo/77.html) - 免密公开，无需 Token。
+
+    Args:
+        source: Data source ('rmfyalk' / 'wenshu' / 'court_guiding'). Default 'rmfyalk'.
+        keyword: Search keyword (e.g. "民间借贷" / "保证责任" / "虚拟货币").
+        token: Optional explicit authentication token (overrides env/config).
+        cookie: Optional explicit cookie (primarily for wenshu).
+        page: Page number (1-indexed, default 1).
+        size: Result count limit (default 10).
+
+    Returns:
+        {"source", "keyword", "page", "size", "total", "count", "records": [...]}
+    """
+    try:
+        return case_search.search_cases(
+            source=source,
+            keyword=keyword,
+            token=token,
+            cookie=cookie,
+            page=page,
+            size=size,
+        )
+    except Exception as e:
+        return {"source": source, "keyword": keyword, "records": [], "count": 0, "error": f"{type(e).__name__}: {e}"}
+
+
+@mcp.tool()
+def get_case_detail(
+    source: str = "rmfyalk",
+    case_id: str = "",
+    token: str | None = None,
+    cookie: str | None = None,
+) -> dict:
+    """Fetch full text, reasoning, and key points of a judicial case.
+
+    Args:
+        source: Data source ('rmfyalk' / 'wenshu' / 'court_guiding').
+        case_id: Case GID (for rmfyalk), DocId (for wenshu), or detail page URL.
+        token: Optional explicit authentication token.
+        cookie: Optional explicit cookie (for wenshu).
+
+    Returns:
+        Dict containing case metadata (title, case_no, court, judge_date),
+        and structured text sections (key_points, facts, reasoning, ruling/full_text).
+    """
+    try:
+        return case_search.get_case_detail(
+            source=source,
+            case_id=case_id,
+            token=token,
+            cookie=cookie,
+        )
+    except Exception as e:
+        return {"source": source, "case_id": case_id, "error": f"{type(e).__name__}: {e}"}
 
 
 if __name__ == "__main__":
