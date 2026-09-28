@@ -15,8 +15,13 @@ from .errors import (
     UnknownSourceError,
     WafBlockedError,
 )
+from .gateway import CaseGateway, get_default_gateway
+from .provider import CaseProvider
 
 __all__ = [
+    "CaseGateway",
+    "get_default_gateway",
+    "CaseProvider",
     "CaseSource",
     "CaseQuery",
     "CaseRecord",
