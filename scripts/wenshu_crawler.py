@@ -457,6 +457,16 @@ def fetch_case_detail(
             "error": f"REQUEST_FAILED: {e}",
         }
 
+    code = data.get("code")
+    msg = data.get("msg") or data.get("message") or data.get("description")
+    if code in (1, 9, 401, 403) or "没有权限" in str(msg) or "失效" in str(msg) or "请登录" in str(msg):
+        return {
+            "source": "wenshu",
+            "doc_id": clean_id,
+            "error": "AUTH_REQUIRED",
+            "message": f"裁判文书网凭证已失效或未登录（响应信息: {msg or code}）。\n{WENSHU_HELP_MSG}",
+        }
+
     if isinstance(data, dict) and data.get("secretKey") and data.get("result"):
         iv = datetime.now().strftime("%Y%m%d")
         try:
