@@ -459,7 +459,8 @@ def fetch_case_detail(
 
     code = data.get("code")
     msg = data.get("msg") or data.get("message") or data.get("description")
-    if code in (1, 9, 401, 403) or "没有权限" in str(msg) or "失效" in str(msg) or "请登录" in str(msg):
+    has_payload = bool(data.get("secretKey") and data.get("result")) or bool(data.get("result"))
+    if not has_payload and (code in (9, 401, 403) or "没有权限" in str(msg) or "失效" in str(msg) or "请登录" in str(msg)):
         return {
             "source": "wenshu",
             "doc_id": clean_id,
