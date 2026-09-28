@@ -148,7 +148,7 @@ def search_cases(
         "pageNum": str(page),
         "pageSize": str(size),
         "queryCondition": json.dumps([{"key": "s8", "value": "02"}], ensure_ascii=False),
-        "cfg": "com.lawyee.judge.dc.parse.dto.SearchDataDq",
+        "cfg": "com.lawyee.judge.dc.parse.dto.SearchDataDsoDTO@queryDoc",
     }
     if keyword:
         payload["queryCondition"] = json.dumps([
@@ -206,8 +206,8 @@ def search_cases(
 
     # Check for authentication or error code in response
     code = str(data.get("code") or data.get("status") or "")
-    msg = data.get("msg") or data.get("message") or ""
-    if code in ("401", "403") or "未登录" in msg:
+    msg = data.get("msg") or data.get("message") or data.get("description") or ""
+    if code in ("401", "403") or "未登录" in msg or "没有权限" in msg:
         return {
             "source": "wenshu",
             "keyword": keyword,
@@ -215,7 +215,7 @@ def search_cases(
             "count": 0,
             "records": [],
             "error": "AUTHENTICATION_FAILED",
-            "message": f"裁判文书网凭证已失效（响应信息: {msg or code}）。\n{WENSHU_HELP_MSG}",
+            "message": f"裁判文书网凭证已失效或未登录（响应信息: {msg or code}）。\n{WENSHU_HELP_MSG}",
         }
 
     res_field = data.get("result")
@@ -236,8 +236,13 @@ def search_cases(
 
     raw_list = []
     if isinstance(res_field, dict):
-        raw_list = res_field.get("list") or []
-        total = res_field.get("total") or len(raw_list)
+        query_result = res_field.get("queryResult")
+        if isinstance(query_result, dict):
+            raw_list = query_result.get("resultList") or []
+            total = query_result.get("resultCount") or len(raw_list)
+        else:
+            raw_list = res_field.get("list") or []
+            total = res_field.get("total") or len(raw_list)
     elif isinstance(data_field, dict):
         raw_list = data_field.get("list") or []
         total = data_field.get("total") or len(raw_list)
@@ -249,15 +254,24 @@ def search_cases(
 
     records = []
     for item in raw_list:
-        if not isinstance(item, dict):
+        if isinstance(item, list):
+            doc_id = str(item[0]) if len(item) > 0 else ""
+            title = clean_text(item[1]) if len(item) > 1 else ""
+            court = str(item[2]) if len(item) > 2 else ""
+            case_no = str(item[7]) if len(item) > 7 else ""
+            case_type = str(item[8]) if len(item) > 8 else ""
+            judge_date = str(item[31]) if len(item) > 31 else ""
+            reasoning = clean_text(item[26]) if len(item) > 26 else ""
+        elif isinstance(item, dict):
+            doc_id = item.get("DocId") or item.get("id") or item.get("rowkey") or item.get("s0", "")
+            title = clean_text(item.get("案件名称") or item.get("s1") or item.get("title", ""))
+            case_no = item.get("案号") or item.get("s7") or ""
+            court = item.get("审判法院") or item.get("s2") or ""
+            judge_date = item.get("裁判日期") or item.get("s31") or ""
+            case_type = item.get("案件类型") or item.get("s8") or ""
+            reasoning = clean_text(item.get("裁判要旨") or item.get("s26") or "")
+        else:
             continue
-        doc_id = item.get("DocId") or item.get("id") or item.get("s0", "")
-        title = clean_text(item.get("案件名称") or item.get("s1") or item.get("title", ""))
-        case_no = item.get("案号") or item.get("s7") or ""
-        court = item.get("审判法院") or item.get("s2") or ""
-        judge_date = item.get("裁判日期") or item.get("s31") or ""
-        case_type = item.get("案件类型") or item.get("s8") or ""
-        reasoning = clean_text(item.get("裁判要旨") or item.get("s26") or "")
 
         records.append({
             "source": "wenshu",
