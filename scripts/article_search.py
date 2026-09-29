@@ -33,7 +33,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (
     _CacheManager,
+    classify_legal_document_type,
     extract_paragraphs_from_docx,
+    get_amendment_warning,
     get_cache,
     http_request as _request,
     split_into_articles,
@@ -82,33 +84,6 @@ def search_articles(keyword: str, law_keyword: str = None,
     skipped_resume = 0
     skipped_offset = offset
 
-    # Record which laws were already cached BEFORE this run started (for resume mode)
-    initially_cached_bbbs = set()
-    target_bbbs = []
-    for r in all_rows:
-        if len(target_bbbs) >= max_laws:
-            break
-        b = r.get("bbbs")
-        if b:
-            target_bbbs.append(b)
-            if _cache.get_file(_cache._key("docx", b)) is not None:
-                initially_cached_bbbs.add(b)
-
-    uncached_bbbs = [b for b in target_bbbs if b not in initially_cached_bbbs]
-    if len(uncached_bbbs) > 1:
-        from concurrent.futures import ThreadPoolExecutor
-
-        def _prefetch_docx(b_id):
-            try:
-                d_url = get_download_url(b_id, "docx")
-                res = _request("GET", d_url)
-                _cache.set_file(_cache._key("docx", b_id), res.content)
-            except Exception:
-                pass
-
-        with ThreadPoolExecutor(max_workers=min(len(uncached_bbbs), 3)) as executor:
-            list(executor.map(_prefetch_docx, uncached_bbbs))
-
     for row in all_rows:
         if processed >= max_laws:
             break
@@ -117,7 +92,8 @@ def search_articles(keyword: str, law_keyword: str = None,
         title = re.sub(r"<[^>]+>", "", row.get("title", ""))
         status_code = row.get("sxx", 0)
 
-        if resume and bbbs in initially_cached_bbbs:
+        docx_key = _cache._key("docx", bbbs)
+        if resume and _cache.get_file(docx_key) is not None:
             skipped_resume += 1
             skipped_offset += 1
             continue
@@ -125,7 +101,6 @@ def search_articles(keyword: str, law_keyword: str = None,
         print(f"Step 2/3: [{processed+1}/{max_laws}] {title[:50]}...",
               end=" ", file=sys.stderr, flush=True)
 
-        docx_key = _cache._key("docx", bbbs)
         docx_bytes = _cache.get_file(docx_key)
 
         if docx_bytes is None:
@@ -160,15 +135,20 @@ def search_articles(keyword: str, law_keyword: str = None,
                         "is_match": keyword in text,
                     })
 
-                all_matches.append({
+                match_entry = {
                     "title": title,
                     "bbbs": bbbs,
                     "status_str": sxx_to_str(status_code),
                     "status_code": status_code,
+                    "doc_type": classify_legal_document_type(title),
                     "total_articles": len(articles),
                     "matched_articles": len([m for m in law_matches if m["is_match"]]),
                     "articles": law_matches,
-                })
+                }
+                warning = get_amendment_warning(title)
+                if warning:
+                    match_entry["warning"] = warning
+                all_matches.append(match_entry)
                 print(f"FOUND {len([m for m in law_matches if m['is_match']])} matches",
                       file=sys.stderr)
             else:

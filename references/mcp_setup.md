@@ -22,7 +22,7 @@ in 2.0 — do not install `mcp<2.0.0` for this server.
 python3 scripts/mcp_server.py    # stdio transport; waits for an MCP client
 ```
 
-It registers 6 tools:
+It registers 7 tools:
 
 | Tool | 说明 |
 |---|---|
@@ -30,8 +30,9 @@ It registers 6 tools:
 | `get_law_detail(source, url)` | 拉取单条记录的详情（npc 传 bbbs id，其余传详情 URL，自动附带修改决定预警） |
 | `query_article(bbbs_id, query?, grep?)` | 按条文号（如"第三十八条"）或关键词检索某部法律的法条 |
 | `preview_law(bbbs_id)` | 预览一部法律的结构：标题、条数、编号格式、前 20 条 |
-| `article_search(keyword, law_keyword?, max_laws?, context?)` | 跨多部法律并发检索法条关键词 |
-| `format_legal_citation(law_name, article, paragraph?, item?)` | 裁判文书标准法律引用格式化（依最高法【法释〔2009〕14号】规范） |
+| `article_search(keyword, law_keyword?, max_laws?, context?)` | 跨多部法律检索法条关键词 |
+| `search_cases(source?, keyword?, token?, cookie?, page?, size?)` | 司法判例跨库检索（人民法院案例库/裁判文书网/最高法指导案例） |
+| `get_case_detail(source?, case_id, token?, cookie?)` | 获取案例全文、裁判理由及裁判要旨 |
 
 `search_laws` 的 `category` 对 `gov_rules`（部门规章 / 地方政府规章）和
 `treaty`（全部 / 双边 / 多边）为必填；其余源可选。

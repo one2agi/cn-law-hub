@@ -30,7 +30,7 @@ def extract_paragraphs_from_docx(content: bytes) -> list:
                 text = result.stdout.decode("utf-8", errors="replace")
                 if text.strip():
                     return [line for line in text.split("\n") if line.strip()]
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+        except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError):
             continue
 
     # Pure-Python MS-DOC (Word 97-2004 binary OLE) extraction fallback
@@ -50,6 +50,7 @@ def extract_paragraphs_from_docx(content: bytes) -> list:
 
 def _extract_from_doc_binary(content: bytes) -> list:
     """Pure-Python extraction of text from Word 97-2004 (.doc / OLE) files via Piece Table."""
+    ole = None
     try:
         import struct
         import olefile
@@ -114,10 +115,17 @@ def _extract_from_doc_binary(content: bytes) -> list:
         return [l for l in lines if l]
     except Exception:
         return []
+    finally:
+        if ole is not None and hasattr(ole, "close"):
+            try:
+                ole.close()
+            except Exception:
+                pass
 
 
 def _extract_from_doc_fallback(content: bytes) -> list:
     """Fallback scanner for UTF-16LE / CP936 text in OLE streams."""
+    ole = None
     try:
         import olefile
 
@@ -166,6 +174,12 @@ def _extract_from_doc_fallback(content: bytes) -> list:
         return best_lines
     except Exception:
         return []
+    finally:
+        if ole is not None and hasattr(ole, "close"):
+            try:
+                ole.close()
+            except Exception:
+                pass
 
 
 def is_article_line(line: str) -> bool:

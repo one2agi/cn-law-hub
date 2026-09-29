@@ -89,9 +89,9 @@ Use `scripts/case_search.py`, `scripts/case_gateway/`, or MCP tools `search_case
   detail = gw.get_detail("https://www.court.gov.cn/shenpan/xiangqing/490521.html")
   ```
 
-## Legal Citation Standard (裁判文书规范引用)
+## Legal Citation Standard (裁判文书规范引用指引)
 
-When drafting court filings, briefs, or legal memos, format statutory citations deterministically using `format_legal_citation` (or follow SPC Fa Shi [2009] No. 14):
+When drafting court filings, briefs, or legal memos, follow SPC Fa Shi [2009] No. 14:
 - Standard pattern: `《法规名称》（发文字号）第X条第Y款第（Z）项`（汉字大写数词）。
 - Sub-articles must retain "之一/之二" (e.g. `第一百三十三条之一` for dangerous driving).
 

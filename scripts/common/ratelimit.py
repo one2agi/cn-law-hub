@@ -6,29 +6,12 @@ import time
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional
-from urllib.parse import urlparse
-
 import requests
 
 from .constants import BASE_BACKOFF, MAX_BACKOFF, MAX_RETRIES, RETRYABLE_STATUS_CODES, VERIFY_SSL
 from .text_utils import format_request_exception, redact_url
 
 DIRECT_PROXIES = {"http": None, "https": None, "all": None}
-
-
-def is_domestic_gov_domain(url: str) -> bool:
-    """Check if the target URL is an official Chinese government/institutional domain."""
-    try:
-        hostname = urlparse(url).hostname or ""
-        hostname = hostname.lower()
-        return (
-            hostname.endswith(".gov.cn")
-            or hostname == "gov.cn"
-            or hostname.endswith(".12371.cn")
-            or hostname == "12371.cn"
-        )
-    except Exception:
-        return False
 
 
 class RateLimitMode(Enum):
@@ -260,11 +243,6 @@ def http_request(method, url, headers=None, session=None, allowed_statuses=None,
             req_timeout = 8
     kwargs["timeout"] = req_timeout
     kwargs.setdefault("verify", VERIFY_SSL)
-
-    force_proxy = os.environ.get("NPC_LAW_USE_PROXY", "").strip().lower() in ("1", "true")
-    if is_domestic_gov_domain(url) and not force_proxy:
-        if "proxies" not in kwargs:
-            kwargs["proxies"] = dict(DIRECT_PROXIES)
 
     limiter = _get_limiter()
     is_mocked_request = hasattr(requests.request, "assert_called") or hasattr(requests.request, "mock")

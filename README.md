@@ -319,16 +319,17 @@ python3 scripts/mcp_server.py        # 启动 stdio server（等待 MCP 客户�
 Claude Code 会自动读取仓库根目录的 [`.mcp.json`](.mcp.json)，打开项目即接入；
 其他 agent 的配置见 [`references/mcp_setup.md`](references/mcp_setup.md)。
 
-提供 6 个工具：
+提供 7 个工具：
 
 | 工具 | 说明 |
 |---|---|
-| `search_laws(source, keyword, category?, size?)` | 统一搜索 10 个数据源 |
+| `search_laws(source, keyword, category?, size?)` | 统一搜索 10 个官方数据源法规规章政策 |
 | `get_law_detail(source, url)` | 拉取单条记录详情（含修改决定条号顺移预警） |
 | `query_article(bbbs_id, query?, grep?)` | 按条号/关键词查单部法律法条 |
 | `preview_law(bbbs_id)` | 预览法律结构（条数 / 编号格式 / 前 20 条） |
-| `article_search(keyword, law_keyword?, max_laws?, context?)` | 跨法规法条级并发搜索 |
-| `format_legal_citation(law_name, article, paragraph?, item?)` | 裁判文书标准法律引用格式化（依最高法规范） |
+| `article_search(keyword, law_keyword?, max_laws?, context?)` | 跨法规法条级精准检索 |
+| `search_cases(source?, keyword?, token?, cookie?, page?, size?)` | 司法判例跨库检索（人民法院案例库/裁判文书网/最高法指导案例） |
+| `get_case_detail(source?, case_id, token?, cookie?)` | 获取案例全文、裁判理由及裁判要旨 |
 
 ---
 

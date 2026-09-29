@@ -25,7 +25,6 @@ from common import (
     _CacheManager,
     clean_text,
     create_crawler_headers,
-    create_http_session,
     ensure_dir,
     get_cache,
     http_request,
@@ -64,14 +63,6 @@ CATEGORY_NAMES = {v: k for k, v in CATEGORY_MAP.items() if v}
 HEADERS = create_crawler_headers()
 
 _cache = get_cache("court-law-db")
-_session = None
-
-
-def _get_session():
-    global _session
-    if _session is None:
-        _session = create_http_session()
-    return _session
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +86,7 @@ def fetch_list_page(category_id: str, page: int = 1, timeout: int | None = None)
     if cached:
         return cached
 
-    resp = http_request("GET", url, headers=HEADERS, session=_get_session(), timeout=timeout)
+    resp = http_request("GET", url, headers=HEADERS, timeout=timeout)
     resp.encoding = "utf-8"
     _cache.set(cache_key, resp.text)
     return resp.text
@@ -176,7 +167,7 @@ def fetch_detail(detail_url: str, timeout: int | None = None) -> dict:
     if cached:
         return cached
 
-    resp = http_request("GET", detail_url, headers=HEADERS, session=_get_session(), timeout=timeout)
+    resp = http_request("GET", detail_url, headers=HEADERS, timeout=timeout)
     resp.encoding = "utf-8"
 
     result = {
@@ -239,7 +230,7 @@ def search_keyword_in_records(records: list[dict], keyword: str) -> list[dict]:
 def search_collect(
     keyword: str = "", category: str = "", max_items: int = 20, timeout: int | None = None
 ) -> list[dict]:
-    """Search and collect judicial documents with concurrent page pre-fetching."""
+    """Search and collect judicial documents sequentially."""
     records = []
     cat_key = CATEGORY_MAP.get(category, "")
 
@@ -254,8 +245,11 @@ def search_collect(
             break
 
         # Fetch page 1 first to check total_pages
-        html = fetch_list_page(cat_id, page=1, timeout=timeout)
-        items, total_pages = parse_list_page(html)
+        try:
+            html = fetch_list_page(cat_id, page=1, timeout=timeout)
+            items, total_pages = parse_list_page(html)
+        except Exception:
+            continue
 
         if items and keyword:
             items = search_keyword_in_records(items, keyword)
@@ -269,38 +263,22 @@ def search_collect(
         if len(records) >= max_items or total_pages <= 1:
             continue
 
-        # Fetch subsequent pages in parallel batches of 3
-        remaining_pages = list(range(2, min(total_pages + 1, 15)))
-        batch_size = 3
-        from concurrent.futures import ThreadPoolExecutor
-
-        for i in range(0, len(remaining_pages), batch_size):
+        # Fetch subsequent pages sequentially
+        for p in range(2, min(total_pages + 1, 15)):
             if len(records) >= max_items:
                 break
-            batch = remaining_pages[i : i + batch_size]
-            with ThreadPoolExecutor(max_workers=min(len(batch), 3)) as executor:
-                futures = {
-                    executor.submit(fetch_list_page, cat_id, p, timeout): p
-                    for p in batch
-                }
-                batch_results = []
-                for fut in futures:
-                    p = futures[fut]
-                    try:
-                        p_html = fut.result()
-                        p_items, _ = parse_list_page(p_html)
-                        if p_items and keyword:
-                            p_items = search_keyword_in_records(p_items, keyword)
-                        batch_results.append((p, p_items))
-                    except Exception:
-                        pass
-                batch_results.sort(key=lambda x: x[0])
-                for _, p_items in batch_results:
-                    for item in p_items or []:
-                        if len(records) >= max_items:
-                            break
-                        item["category"] = CATEGORY_NAMES.get(cat_id, f"栏目{cat_id}")
-                        records.append(item)
+            try:
+                p_html = fetch_list_page(cat_id, p, timeout=timeout)
+                p_items, _ = parse_list_page(p_html)
+                if p_items and keyword:
+                    p_items = search_keyword_in_records(p_items, keyword)
+                for item in p_items or []:
+                    if len(records) >= max_items:
+                        break
+                    item["category"] = CATEGORY_NAMES.get(cat_id, f"栏目{cat_id}")
+                    records.append(item)
+            except Exception:
+                pass
 
     return records
 

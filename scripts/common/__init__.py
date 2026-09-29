@@ -61,7 +61,6 @@ from .ratelimit import (
     create_http_session,
     http_request,
     init_limiter,
-    is_domestic_gov_domain,
 )
 
 # Re-export text utilities + factory
@@ -72,7 +71,6 @@ from .text_utils import (
     decode_filename_from_url,
     ensure_dir,
     extract_year,
-    format_legal_citation,
     format_request_exception,
     get_amendment_warning,
     redact_url,

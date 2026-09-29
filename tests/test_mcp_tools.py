@@ -132,6 +132,17 @@ class TestGetLawDetailRouting:
         result = mcp_server.get_law_detail("nope", "http://x")
         assert "error" in result
 
+    def test_amendment_warning_included_in_detail(self):
+        with mock.patch.object(
+            mcp_server.gov_policy_library,
+            "fetch_detail_page",
+            return_value={"title": "国务院关于修改《全国年节及纪念日放假办法》的决定"},
+        ):
+            result = mcp_server.get_law_detail("gov_policy", "http://x")
+        assert result["doc_type"] == "amendment_decision"
+        assert "warning" in result
+        assert "条号顺移" in result["warning"]
+
 
 # ── query_article ────────────────────────────────────────────────────────
 
@@ -241,20 +252,6 @@ class TestArticleSearch:
         ):
             result = mcp_server.article_search("违约金")
         assert result["count"] == 0
-        assert "error" in result
-
-
-# ── format_legal_citation tool ──────────────────────────────────────────
-
-class TestFormatLegalCitationTool:
-    def test_tool_formats_citation(self):
-        result = mcp_server.format_legal_citation("民法典", "667")
-        assert result["formatted_citation"] == "《民法典》第六百六十七条"
-        assert result["article"] == "第六百六十七条"
-
-    def test_tool_handles_exception(self):
-        with mock.patch.object(mcp_server, "format_citation_helper", side_effect=ValueError("fail")):
-            result = mcp_server.format_legal_citation("bad", "0")
         assert "error" in result
 
 
