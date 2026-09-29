@@ -75,3 +75,43 @@ def create_crawler_headers(accept: str = "text/html,application/xhtml+xml,applic
         "User-Agent": DEFAULT_USER_AGENT,
         "Accept": accept,
     }
+
+
+def classify_legal_document_type(title: str) -> str:
+    """Classify document type based on title patterns.
+    Returns: 'amendment_decision', 'judicial_reply', 'judicial_interpretation', 'statute', or 'full_text'.
+    """
+    clean_t = clean_text(title)
+    if ("修改" in clean_t and "决定" in clean_t) or "修正案" in clean_t:
+        return "amendment_decision"
+    if "批复" in clean_t:
+        return "judicial_reply"
+
+    base_t = re.sub(r"[（\(].*?[）\)]", "", clean_t).strip()
+    if (
+        any(k in clean_t for k in ["司法解释", "司法观点", "会议纪要", "纪要"])
+        or (("最高人民法院" in clean_t or "最高人民检察院" in clean_t) and any(clean_t.endswith(s) or base_t.endswith(s) for s in ["规定", "解释", "通知", "意见", "办法"]))
+        or base_t.endswith(("规定", "解释"))
+    ):
+        return "judicial_interpretation"
+
+    if any(base_t.endswith(s) for s in ["法", "典", "条例", "通则", "准则"]):
+        return "statute"
+
+    return "full_text"
+
+
+def get_amendment_warning(title: str) -> str | None:
+    """Return a cautionary warning for legal professionals if the document is an amendment decision."""
+    doc_type = classify_legal_document_type(title)
+    if doc_type == "amendment_decision":
+        return (
+            "⚠️【专业律师提示】当前文档为《修改决定》（法规补丁文件），仅包含修订条文，"
+            "可能存在条款增删导致的后续条号顺移。在撰写诉讼文书时，请结合全国人大库(NPC)现行有效整合版本核对最终条号，"
+            "防止因条号位移导致法庭援引错误。"
+        )
+    return None
+
+
+
+

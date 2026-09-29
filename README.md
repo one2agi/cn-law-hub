@@ -83,20 +83,11 @@ Chinese legal research Agent Skill for retrieving and verifying Chinese laws fro
 
 ## 安装
 
-建议使用 Python 3.10+。
+支持 **Windows、macOS、Linux** 全平台，建议使用 Python 3.10+。
+通过纯 Python（内置 `olefile`）原生解析 Word 97（`.doc`）公文，**无需安装任何系统底层命令（如 antiword/catdoc）**：
 
 ```bash
 pip install -r requirements.txt
-```
-
-部分旧法规可能使用 `.doc` 格式，需要安装可选系统工具：
-
-```bash
-# macOS
-brew install antiword catdoc
-
-# Debian/Ubuntu
-apt-get install antiword catdoc
 ```
 
 如需通过 **MCP** 接入（可选，见下文）：
@@ -306,11 +297,6 @@ pip install "mcp>=2.0.0"
 python3 scripts/mcp_server.py        # 启动 stdio server（等待 MCP 客户端连接）
 ```
 
-```bash
-pip install "mcp>=2.0.0"
-python3 scripts/mcp_server.py        # 启动 stdio server（等待 MCP 客户端连接）
-```
-
 Claude Code 会自动读取仓库根目录的 [`.mcp.json`](.mcp.json)，打开项目即接入；
 其他 agent 的配置见 [`references/mcp_setup.md`](references/mcp_setup.md)。
 
@@ -319,7 +305,7 @@ Claude Code 会自动读取仓库根目录的 [`.mcp.json`](.mcp.json)，打开�
 | 工具 | 说明 |
 |---|---|
 | `search_laws(source, keyword, category?, size?)` | 统一搜索 10 个数据源 |
-| `get_law_detail(source, url)` | 拉取单条记录详情 |
+| `get_law_detail(source, url)` | 拉取单条记录详情（含修改决定条号顺移预警） |
 | `query_article(bbbs_id, query?, grep?)` | 按条号/关键词查单部法律法条 |
 | `preview_law(bbbs_id)` | 预览法律结构（条数 / 编号格式 / 前 20 条） |
 | `article_search(keyword, law_keyword?, max_laws?, context?)` | 跨法规法条级搜索 |

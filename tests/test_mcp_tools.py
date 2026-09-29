@@ -132,6 +132,17 @@ class TestGetLawDetailRouting:
         result = mcp_server.get_law_detail("nope", "http://x")
         assert "error" in result
 
+    def test_amendment_warning_included_in_detail(self):
+        with mock.patch.object(
+            mcp_server.gov_policy_library,
+            "fetch_detail_page",
+            return_value={"title": "国务院关于修改《全国年节及纪念日放假办法》的决定"},
+        ):
+            result = mcp_server.get_law_detail("gov_policy", "http://x")
+        assert result["doc_type"] == "amendment_decision"
+        assert "warning" in result
+        assert "条号顺移" in result["warning"]
+
 
 # ── query_article ────────────────────────────────────────────────────────
 
@@ -242,3 +253,6 @@ class TestArticleSearch:
             result = mcp_server.article_search("违约金")
         assert result["count"] == 0
         assert "error" in result
+
+
+

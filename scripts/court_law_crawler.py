@@ -70,7 +70,7 @@ _cache = get_cache("court-law-db")
 # ---------------------------------------------------------------------------
 
 
-def fetch_list_page(category_id: str, page: int = 1, timeout: int = 30):
+def fetch_list_page(category_id: str, page: int = 1, timeout: int | None = None):
     """Fetch a category list page.
 
     Page 1: /fabu/gengduo/{cat_id}.html
@@ -160,7 +160,7 @@ def parse_list_page(html: str) -> tuple[list[dict], int]:
 # ---------------------------------------------------------------------------
 
 
-def fetch_detail(detail_url: str, timeout: int = 30) -> dict:
+def fetch_detail(detail_url: str, timeout: int | None = None) -> dict:
     """Fetch and parse a judicial document detail page."""
     cache_key = _cache._key("detail", detail_url)
     cached = _cache.get(cache_key, max_age=86400)
@@ -181,10 +181,10 @@ def fetch_detail(detail_url: str, timeout: int = 30) -> dict:
     if BeautifulSoup is not None:
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # Title from h1
-        h1 = soup.select_one("h1")
-        if h1:
-            result["title"] = clean_text(h1.get_text(" ", strip=True))
+        # Title from h1, .title, or .tit
+        title_el = soup.select_one("h1") or soup.select_one(".title") or soup.select_one(".tit")
+        if title_el:
+            result["title"] = clean_text(title_el.get_text(" ", strip=True))
 
         # Content
         content = (
@@ -228,42 +228,57 @@ def search_keyword_in_records(records: list[dict], keyword: str) -> list[dict]:
 
 
 def search_collect(
-    keyword: str = "", category: str = "", max_items: int = 20, timeout: int = 30
+    keyword: str = "", category: str = "", max_items: int = 20, timeout: int | None = None
 ) -> list[dict]:
-    """Search and collect judicial documents."""
+    """Search and collect judicial documents sequentially."""
     records = []
     cat_key = CATEGORY_MAP.get(category, "")
 
     if cat_key:
         categories_to_fetch = [cat_key]
     else:
-        # Default to司法解释 and 司法文件 for "全部"
+        # Default to 司法解释 and 司法文件 for "全部"
         categories_to_fetch = ["16", "17"]
 
     for cat_id in categories_to_fetch:
         if len(records) >= max_items:
             break
 
-        page = 1
-        total_pages = 1
-
-        while len(records) < max_items and page <= total_pages:
-            html = fetch_list_page(cat_id, page=page, timeout=timeout)
+        # Fetch page 1 first to check total_pages
+        try:
+            html = fetch_list_page(cat_id, page=1, timeout=timeout)
             items, total_pages = parse_list_page(html)
+        except Exception:
+            continue
 
-            if not items:
+        if items and keyword:
+            items = search_keyword_in_records(items, keyword)
+
+        for item in items or []:
+            if len(records) >= max_items:
                 break
+            item["category"] = CATEGORY_NAMES.get(cat_id, f"栏目{cat_id}")
+            records.append(item)
 
-            if keyword:
-                items = search_keyword_in_records(items, keyword)
+        if len(records) >= max_items or total_pages <= 1:
+            continue
 
-            for item in items:
-                if len(records) >= max_items:
-                    break
-                item["category"] = CATEGORY_NAMES.get(cat_id, f"栏目{cat_id}")
-                records.append(item)
-
-            page += 1
+        # Fetch subsequent pages sequentially
+        for p in range(2, min(total_pages + 1, 15)):
+            if len(records) >= max_items:
+                break
+            try:
+                p_html = fetch_list_page(cat_id, p, timeout=timeout)
+                p_items, _ = parse_list_page(p_html)
+                if p_items and keyword:
+                    p_items = search_keyword_in_records(p_items, keyword)
+                for item in p_items or []:
+                    if len(records) >= max_items:
+                        break
+                    item["category"] = CATEGORY_NAMES.get(cat_id, f"栏目{cat_id}")
+                    records.append(item)
+            except Exception:
+                pass
 
     return records
 
@@ -355,7 +370,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--rate-limit", choices=["auto", "off", "fixed", "adaptive"], default="auto"
     )
-    parser.add_argument("--timeout", type=int, default=30)
+    parser.add_argument("--timeout", type=int, default=None)
     parser.add_argument("--no-cache", action="store_true")
     parser.add_argument("--cache-stats", action="store_true")
     parser.add_argument("--cache-clear", action="store_true")

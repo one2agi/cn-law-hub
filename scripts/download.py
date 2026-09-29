@@ -54,12 +54,10 @@ from common import (
     extract_paragraphs_from_docx as _extract_paragraphs_from_docx,
 )
 from common import (
+    classify_legal_document_type,
+    get_amendment_warning,
     is_article_line as _is_article_line,
-)
-from common import (
     match_article_query as _match_article_query,
-)
-from common import (
     split_into_articles as _split_into_articles,
 )
 
@@ -167,9 +165,12 @@ def parse_detail(data: dict) -> dict:
     d = data.get("data", {})
     oss = d.get("ossFile", {}) or {}
     sxx_code = d.get("sxx", 0)
+    title = d.get("title", "Unknown")
     return {
         "bbbs": d.get("bbbs", ""),
-        "title": d.get("title", "Unknown"),
+        "title": title,
+        "doc_type": classify_legal_document_type(title),
+        "warning": get_amendment_warning(title),
         "category": d.get("flxz", ""),
         "authority": d.get("zdjgName", ""),
         "publish_date": d.get("gbrq", ""),
@@ -230,6 +231,11 @@ def print_detail(info: dict):
         print("Failed to fetch detail")
         return
     print(f"Title: {info['title']}")
+    if info.get("doc_type"):
+        print(f"Doc Type: {info['doc_type']}")
+    warning = info.get("warning") or get_amendment_warning(info.get("title", ""))
+    if warning:
+        print(f"\n{warning}\n")
     print(f"Category: {info['category']}")
     print(f"Authority: {info['authority']}")
     print(f"Publish Date: {info['publish_date']}")
@@ -354,6 +360,9 @@ def preview_law(bbbs_id: str):
     articles = _split_into_articles(paragraphs)
     article_count = len([a for a in articles if _is_article_line(a[0])])
     print(f"【{info['title']}】")
+    warning = get_amendment_warning(info.get("title", ""))
+    if warning:
+        print(f"\n{warning}\n")
     print(f"Category: {info['category']} | Authority: {info['authority']}")
     print(f"Publish: {info['publish_date']} | Status: {info['status_str']}")
     print(f"Total paragraphs: {len(paragraphs)} | Articles: {article_count}")
@@ -402,6 +411,9 @@ def query_article(bbbs_id: str, query: str | None = None, grep: str | None = Non
         print("Error: Use --article with query or --grep KEYWORD", file=sys.stderr)
         sys.exit(1)
     print(f"【{info_file['title']}】")
+    warning = get_amendment_warning(info_file.get("title", ""))
+    if warning:
+        print(f"\n{warning}\n")
     if not results:
         print(f"No article found for: {grep or query}")
         if query and detected["sample_titles"]:

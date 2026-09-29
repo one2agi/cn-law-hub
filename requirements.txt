@@ -2,6 +2,7 @@ requests>=2.25.0
 urllib3>=1.26.0
 beautifulsoup4>=4.10.0
 cryptography>=3.0
+olefile>=0.46
 
 # Optional: MCP server only (scripts/mcp_server.py). Skill / CLI do not need it.
 #   pip install "mcp>=2.0.0"

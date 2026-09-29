@@ -55,6 +55,10 @@ def int_to_chinese(n: int) -> str:
         prefix = int_to_chinese(thous) + "千"
         if rest == 0:
             return prefix
+        if rest < 10:
+            return prefix + "零" + int_to_chinese(rest)
+        if rest < 20:
+            return prefix + "零一" + int_to_chinese(rest)
         if rest < 100:
             return prefix + "零" + int_to_chinese(rest)
         return prefix + int_to_chinese(rest)

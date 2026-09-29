@@ -55,18 +55,21 @@ from .ratelimit import (
     RateLimitConfig,
     RateLimitMode,
     SmartRateLimiter,
+    create_http_session,
     http_request,
     init_limiter,
 )
 
 # Re-export text utilities + factory
 from .text_utils import (
+    classify_legal_document_type,
     clean_text,
     create_crawler_headers,
     decode_filename_from_url,
     ensure_dir,
     extract_year,
     format_request_exception,
+    get_amendment_warning,
     redact_url,
     sanitize_filename,
 )
